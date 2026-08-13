@@ -1,0 +1,24 @@
+services:
+  conecta-onboarding:
+    build:
+      context: .
+      args:
+        # Público por design — o client secret não é usado por esta tela.
+        - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+    container_name: conecta-onboarding
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=network_traefik"
+      - "traefik.http.routers.conecta-onboarding-router.rule=Host(`onboarding.citelsoftware.com.br`)"
+      - "traefik.http.routers.conecta-onboarding-router.entrypoints=websecure"
+      - "traefik.http.routers.conecta-onboarding-router.tls=true"
+      - "traefik.http.routers.conecta-onboarding-router.tls.certresolver=tlschallenge"
+      - "traefik.http.services.conecta-onboarding-service.loadbalancer.server.port=80"
+    networks:
+      network_traefik:
+        ipv4_address: 172.20.0.11
+
+networks:
+  network_traefik:
+    external: true

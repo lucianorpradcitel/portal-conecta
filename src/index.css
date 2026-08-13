@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Identidade do protótipo. */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/*
+ * O protótipo carrega Inter do Google Fonts, o que não funciona em rede fechada.
+ * Se o .woff2 for adicionado em public/fonts/, basta descomentar:
+ *
+ * @font-face {
+ *   font-family: 'Inter';
+ *   src: url('/fonts/Inter.woff2') format('woff2');
+ *   font-weight: 400 700;
+ *   font-display: swap;
+ * }
+ */
