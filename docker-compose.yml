@@ -10,7 +10,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=network_traefik"
-      - "traefik.http.routers.conecta-onboarding-router.rule=Host(`onboarding.citelsoftware.com.br`)"
+      - "traefik.http.routers.conecta-onboarding-router.rule=Host(`conecta.citel.app`)"
       - "traefik.http.routers.conecta-onboarding-router.entrypoints=websecure"
       - "traefik.http.routers.conecta-onboarding-router.tls=true"
       - "traefik.http.routers.conecta-onboarding-router.tls.certresolver=tlschallenge"
