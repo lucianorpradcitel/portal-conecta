@@ -52,9 +52,9 @@ export default function App() {
           <div className="flex items-center gap-3">
             <img src="/conecta_logo.png" alt="Conecta" className="h-10 w-auto object-contain" />
             <div>
-              <h1 className="text-xl font-semibold text-slate-800">Onboarding</h1>
+              <h1 className="text-xl font-semibold text-slate-800">Portal Conecta</h1>
               <p className="text-sm text-slate-500">
-                Cadastro de lojistas e integrações do Conecta
+                Cadastro de lojistas e integrações Conecta
               </p>
             </div>
           </div>

@@ -44,7 +44,7 @@ export function TelaLogin({ aoEntrar, aviso }: Props) {
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3">
           <img src="/conecta_logo.png" alt="Conecta" className="h-12 w-auto object-contain" />
-          <h1 className="text-xl font-semibold text-slate-800">Onboarding</h1>
+          <h1 className="text-xl font-semibold text-slate-800">Portal Conecta</h1>
         </div>
 
         <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">

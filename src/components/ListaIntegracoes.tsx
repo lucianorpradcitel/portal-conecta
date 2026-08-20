@@ -60,8 +60,7 @@ export function ListaIntegracoes({ versao = 0 }: Props) {
       <div className="p-5 border-b border-slate-200">
         <h3 className="text-lg font-semibold text-slate-800">Integrações cadastradas</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Somente consulta. Nenhum segredo é carregado nesta tela — nem a chave privada, nem os
-          tokens.
+          
         </p>
       </div>
 
