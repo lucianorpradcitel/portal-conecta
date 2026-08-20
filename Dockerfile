@@ -10,22 +10,33 @@ RUN npm ci
 
 COPY . .
 
-# O client ID é público por design (não é o client secret) e precisa ser inlinado no bundle.
-# Nenhuma credencial entra aqui: a autenticação é sempre pelo Google, no navegador.
+# Variáveis públicas incorporadas ao bundle durante o build.
 ARG VITE_GOOGLE_CLIENT_ID
-ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ARG VITE_API_TARGET
+
+ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+ENV VITE_API_TARGET=${VITE_API_TARGET}
+
+# Interrompe o build se o Portainer/Compose não repassar as variáveis.
+RUN if [ -z "${VITE_GOOGLE_CLIENT_ID}" ]; then \
+      echo "ERRO: VITE_GOOGLE_CLIENT_ID não informado no build"; \
+      exit 1; \
+    fi && \
+    if [ -z "${VITE_API_TARGET}" ]; then \
+      echo "ERRO: VITE_API_TARGET não informado no build"; \
+      exit 1; \
+    fi
 
 RUN npm run build
 
 # ============================================
-# Etapa 2: servindo com Nginx
+# Etapa 2: servidor Nginx
 # ============================================
 FROM nginx:alpine
 
-RUN rm /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/conf.d/default.conf
 
-# O Vite gera em dist/ (o projeto Angular gera em dist/monint/browser).
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /app/dist/ /usr/share/nginx/html/
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
