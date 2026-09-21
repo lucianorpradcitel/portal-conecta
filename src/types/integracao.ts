@@ -1,6 +1,7 @@
 /** Espelha os DTOs da API Monint. */
 
-export type Plataforma = 'tray' | 'mercos'
+/** Sistema externo de uma plataforma cadastrada em CADPLA (ver PlataformaResumo). */
+export type Plataforma = string
 
 /** Item do GET /clientes. */
 export interface ClienteResumo {
@@ -66,4 +67,16 @@ export interface ClienteCriado {
 export interface ErroApi {
   status: number
   error: string
+}
+
+/** Item do GET /plataformas. */
+export interface PlataformaResumo {
+  descricao: string
+  sistemaExterno: string
+}
+
+/** Corpo do POST /plataformas. */
+export interface DadosCriacaoPlataforma {
+  descricao: string
+  sistemaExterno: string
 }

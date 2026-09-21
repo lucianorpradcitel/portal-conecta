@@ -1,22 +1,29 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError, apiPost } from '../services/api'
 import type {
+  ClienteCriado,
   ClienteResumo,
   DadosCriacaoIntegracao,
   IntegracaoCriada,
   Plataforma,
 } from '../types/integracao'
 import { SeletorLojista } from './SeletorLojista'
+import { SeletorPlataforma } from './SeletorPlataforma'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
-import { Select } from './ui/Select'
 import { Textarea } from './ui/Textarea'
 
 interface Props {
   aoCriar: (integracao: IntegracaoCriada) => void
   /** Incrementado quando a aba de lojistas cadastra alguém, para o seletor recarregar. */
   versaoLojistas?: number
+  /** Incrementado quando a aba de Plataformas cadastra uma nova, para o seletor recarregar. */
+  versaoPlataformas?: number
+  /** Chamado quando um lojista é cadastrado por aqui, para outras telas recarregarem a lista. */
+  aoCriarLojista?: () => void
 }
+
+type ModoLojista = 'existente' | 'novo'
 
 interface Formulario {
   codigoCliente: number | null
@@ -26,6 +33,10 @@ interface Formulario {
   urlApi: string
   urlWebservice: string
   chavePrivada: string
+  nomeLojista: string
+  userNameLojista: string
+  senhaLojista: string
+  confirmacaoSenhaLojista: string
 }
 
 const VAZIO: Formulario = {
@@ -36,17 +47,41 @@ const VAZIO: Formulario = {
   urlApi: '',
   urlWebservice: '',
   chavePrivada: '',
+  nomeLojista: '',
+  userNameLojista: '',
+  senhaLojista: '',
+  confirmacaoSenhaLojista: '',
 }
 
 const SLUG = /^[a-z0-9-]{3,40}$/
 
 type Erros = Partial<Record<keyof Formulario, string>>
 
-function validar(form: Formulario): Erros {
+function validar(form: Formulario, modoLojista: ModoLojista): Erros {
   const erros: Erros = {}
 
-  if (!form.codigoCliente) {
-    erros.codigoCliente = 'Selecione o lojista dono da integração'
+  if (modoLojista === 'existente') {
+    if (!form.codigoCliente) {
+      erros.codigoCliente = 'Selecione o lojista dono da integração'
+    }
+  } else {
+    if (!form.nomeLojista.trim()) {
+      erros.nomeLojista = 'Informe a razão social do lojista'
+    }
+
+    if (!form.userNameLojista.trim()) {
+      erros.userNameLojista = 'Informe o usuário de login'
+    }
+
+    if (!form.senhaLojista) {
+      erros.senhaLojista = 'Informe a senha'
+    }
+
+    // A senha é gravada em bcrypt e não pode ser recuperada: um erro de digitação aqui só
+    // apareceria na primeira tentativa de login, e a correção seria recadastrar.
+    if (form.senhaLojista && form.confirmacaoSenhaLojista !== form.senhaLojista) {
+      erros.confirmacaoSenhaLojista = 'As senhas não conferem'
+    }
   }
 
   if (!form.codigoIntegracao) {
@@ -82,8 +117,9 @@ function validar(form: Formulario): Erros {
   return erros
 }
 
-export function FormIntegracao({ aoCriar, versaoLojistas }: Props) {
+export function FormIntegracao({ aoCriar, versaoLojistas, versaoPlataformas, aoCriarLojista }: Props) {
   const [form, setForm] = useState<Formulario>(VAZIO)
+  const [modoLojista, setModoLojista] = useState<ModoLojista>('existente')
   const [erros, setErros] = useState<Erros>({})
   const [erroApi, setErroApi] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
@@ -94,31 +130,54 @@ export function FormIntegracao({ aoCriar, versaoLojistas }: Props) {
     setErroApi(null)
   }
 
+  function trocarModoLojista(modo: ModoLojista) {
+    setModoLojista(modo)
+    setErros({})
+    setErroApi(null)
+  }
+
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
 
-    const encontrados = validar(form)
+    const encontrados = validar(form, modoLojista)
     setErros(encontrados)
     if (Object.keys(encontrados).length > 0) {
       return
-    }
-
-    // A chavePrivada vai exatamente como foi colada: sem trim, sem normalizar quebras de linha.
-    // Reformatar o PEM quebra a assinatura JWT RS256 e o erro só aparece em produção.
-    const corpo: DadosCriacaoIntegracao = {
-      codigoIntegracao: form.codigoIntegracao,
-      codigoCliente: form.codigoCliente!,
-      plataforma: form.plataforma as Plataforma,
-      slug: form.slug,
-      urlApi: form.urlApi.trim() || null,
-      urlWebservice: form.urlWebservice.trim(),
-      chavePrivada: form.chavePrivada,
     }
 
     setEnviando(true)
     setErroApi(null)
 
     try {
+      let codigoCliente = form.codigoCliente
+
+      if (modoLojista === 'novo') {
+        const lojistaCriado = await apiPost<ClienteCriado>('/cadastro', {
+          nome: form.nomeLojista.trim(),
+          userName: form.userNameLojista.trim(),
+          senha: form.senhaLojista,
+        })
+        codigoCliente = lojistaCriado.codigoCliente
+
+        // Trava o lojista recém-criado antes de seguir: se a integração falhar abaixo, uma
+        // nova tentativa de envio não pode recadastrá-lo.
+        setForm((atual) => ({ ...atual, codigoCliente }))
+        setModoLojista('existente')
+        aoCriarLojista?.()
+      }
+
+      // A chavePrivada vai exatamente como foi colada: sem trim, sem normalizar quebras de linha.
+      // Reformatar o PEM quebra a assinatura JWT RS256 e o erro só aparece em produção.
+      const corpo: DadosCriacaoIntegracao = {
+        codigoIntegracao: form.codigoIntegracao,
+        codigoCliente: codigoCliente!,
+        plataforma: form.plataforma as Plataforma,
+        slug: form.slug,
+        urlApi: form.urlApi.trim() || null,
+        urlWebservice: form.urlWebservice.trim(),
+        chavePrivada: form.chavePrivada,
+      }
+
       aoCriar(await apiPost<IntegracaoCriada>('/integracoes', corpo))
     } catch (e: unknown) {
       setErroApi(
@@ -146,17 +205,96 @@ export function FormIntegracao({ aoCriar, versaoLojistas }: Props) {
       </div>
 
       <div className="p-5 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <SeletorLojista
-            valor={form.codigoCliente}
-            erro={erros.codigoCliente}
-            desabilitado={enviando}
-            versao={versaoLojistas}
-            aoSelecionar={(cliente: ClienteResumo | null) =>
-              alterar('codigoCliente', cliente?.codigoCliente ?? null)
-            }
-          />
+        <div className="rounded-md border border-slate-200 p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="inline-flex rounded-md border border-slate-300 text-sm overflow-hidden">
+              <button
+                type="button"
+                disabled={enviando}
+                onClick={() => trocarModoLojista('existente')}
+                className={`px-3 py-1.5 transition-colors duration-150 ${
+                  modoLojista === 'existente'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Selecionar existente
+              </button>
+              <button
+                type="button"
+                disabled={enviando}
+                onClick={() => trocarModoLojista('novo')}
+                className={`px-3 py-1.5 border-l border-slate-300 transition-colors duration-150 ${
+                  modoLojista === 'novo'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Cadastrar novo
+              </button>
+            </div>
+          </div>
 
+          {modoLojista === 'existente' ? (
+            <SeletorLojista
+              valor={form.codigoCliente}
+              erro={erros.codigoCliente}
+              desabilitado={enviando}
+              versao={versaoLojistas}
+              aoSelecionar={(cliente: ClienteResumo | null) =>
+                alterar('codigoCliente', cliente?.codigoCliente ?? null)
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Campo
+                id="nomeLojista"
+                label="Razão social"
+                value={form.nomeLojista}
+                erro={erros.nomeLojista}
+                placeholder="CASA DAS FURADEIRAS LTDA"
+                disabled={enviando}
+                onChange={(e) => alterar('nomeLojista', e.target.value)}
+              />
+
+              <Campo
+                id="userNameLojista"
+                label="Usuário"
+                value={form.userNameLojista}
+                erro={erros.userNameLojista}
+                ajuda="Usado no login da API. Não pode repetir."
+                autoComplete="off"
+                disabled={enviando}
+                onChange={(e) => alterar('userNameLojista', e.target.value)}
+              />
+
+              <Campo
+                id="senhaLojista"
+                label="Senha"
+                type="password"
+                value={form.senhaLojista}
+                erro={erros.senhaLojista}
+                autoComplete="new-password"
+                disabled={enviando}
+                onChange={(e) => alterar('senhaLojista', e.target.value)}
+              />
+
+              <Campo
+                id="confirmacaoSenhaLojista"
+                label="Confirmar senha"
+                type="password"
+                value={form.confirmacaoSenhaLojista}
+                erro={erros.confirmacaoSenhaLojista}
+                ajuda="A senha é gravada criptografada e não pode ser consultada depois."
+                autoComplete="new-password"
+                disabled={enviando}
+                onChange={(e) => alterar('confirmacaoSenhaLojista', e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Campo
             id="codigoIntegracao"
             label="Código da integração"
@@ -168,18 +306,13 @@ export function FormIntegracao({ aoCriar, versaoLojistas }: Props) {
             onChange={(e) => alterar('codigoIntegracao', e.target.value)}
           />
 
-          <Select
-            id="plataforma"
-            label="Plataforma"
-            value={form.plataforma}
+          <SeletorPlataforma
+            valor={form.plataforma}
             erro={erros.plataforma}
-            disabled={enviando}
-            onChange={(e) => alterar('plataforma', e.target.value as Plataforma | '')}
-          >
-            <option value="">Selecione</option>
-            <option value="tray">Tray</option>
-            <option value="mercos">Mercos</option>
-          </Select>
+            desabilitado={enviando}
+            versao={versaoPlataformas}
+            aoSelecionar={(plataforma) => alterar('plataforma', plataforma?.descricao ?? '')}
+          />
 
           <Campo
             id="slug"

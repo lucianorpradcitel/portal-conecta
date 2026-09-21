@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
-import { FormCliente } from './components/FormCliente'
 import { FormIntegracao } from './components/FormIntegracao'
+import { FormPlataforma } from './components/FormPlataforma'
 import { ListaIntegracoes } from './components/ListaIntegracoes'
+import { ListaPlataformas } from './components/ListaPlataformas'
 import { PainelSucesso } from './components/PainelSucesso'
 import { TelaLogin } from './components/TelaLogin'
 import { registrarExpiracao, sair, temSessao, usuarioDaSessao } from './services/api'
 import type { IntegracaoCriada } from './types/integracao'
 
-type Aba = 'integracao' | 'lojista' | 'consulta'
+type Aba = 'integracao' | 'consulta' | 'plataformas'
 
 const ABAS: { id: Aba; rotulo: string }[] = [
   { id: 'integracao', rotulo: 'Nova integração' },
-  { id: 'lojista', rotulo: 'Novo lojista' },
   { id: 'consulta', rotulo: 'Integrações' },
+  { id: 'plataformas', rotulo: 'Plataformas' },
 ]
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
   // Contadores para as abas recarregarem o que a outra mudou.
   const [versaoLojistas, setVersaoLojistas] = useState(0)
   const [versaoIntegracoes, setVersaoIntegracoes] = useState(0)
+  const [versaoPlataformas, setVersaoPlataformas] = useState(0)
 
   useEffect(() => {
     registrarExpiracao(() => {
@@ -99,16 +101,14 @@ export default function App() {
           </div>
         </nav>
 
-        {/*
-          Os formulários ficam montados: trocar de aba no meio do preenchimento da integração
-          para cadastrar um lojista não pode apagar o que já foi digitado.
-        */}
         <div hidden={aba !== 'integracao'}>
           {criada ? (
             <PainelSucesso integracao={criada} aoCadastrarOutra={() => setCriada(null)} />
           ) : (
             <FormIntegracao
               versaoLojistas={versaoLojistas}
+              versaoPlataformas={versaoPlataformas}
+              aoCriarLojista={() => setVersaoLojistas((v) => v + 1)}
               aoCriar={(integracao) => {
                 setCriada(integracao)
                 setVersaoIntegracoes((v) => v + 1)
@@ -117,12 +117,15 @@ export default function App() {
           )}
         </div>
 
-        <div hidden={aba !== 'lojista'}>
-          <FormCliente aoCriar={() => setVersaoLojistas((v) => v + 1)} />
-        </div>
-
         {/* A consulta só monta quando aberta, para não buscar a lista à toa. */}
         {aba === 'consulta' && <ListaIntegracoes versao={versaoIntegracoes} />}
+
+        {aba === 'plataformas' && (
+          <div className="space-y-6">
+            <FormPlataforma aoCriar={() => setVersaoPlataformas((v) => v + 1)} />
+            <ListaPlataformas versao={versaoPlataformas} />
+          </div>
+        )}
       </div>
     </div>
   )
