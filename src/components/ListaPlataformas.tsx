@@ -1,7 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, apiGet } from '../services/api'
 import type { PlataformaResumo } from '../types/integracao'
-import { Botao } from './ui/Botao'
+import { IconeCamadas, IconeLupa } from './ui/Icones'
+import {
+  BotaoAtualizar,
+  CampoBusca,
+  Carregando,
+  CartaoConsulta,
+  Celula,
+  Codigo,
+  EstadoVazio,
+  EtiquetaPlataforma,
+  Linha,
+  RodapeContagem,
+  Tabela,
+  TituloConsulta,
+} from './ui/Tabela'
 
 interface Props {
   /** Incrementado quando uma plataforma é criada no formulário acima. */
@@ -11,6 +25,7 @@ interface Props {
 /** Consulta das plataformas cadastradas (CADPLA). */
 export function ListaPlataformas({ versao = 0 }: Props) {
   const [plataformas, setPlataformas] = useState<PlataformaResumo[]>([])
+  const [busca, setBusca] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -30,47 +45,81 @@ export function ListaPlataformas({ versao = 0 }: Props) {
     carregar()
   }, [carregar, versao])
 
-  return (
-    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-      <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-800">Plataformas cadastradas</h3>
-        <Botao type="button" variante="secundario" onClick={carregar} disabled={carregando}>
-          {carregando ? 'Carregando…' : 'Atualizar'}
-        </Botao>
-      </div>
+  const visiveis = useMemo(() => {
+    const termo = busca.trim().toLowerCase()
+    return termo
+      ? plataformas.filter(
+          (p) => p.descricao.toLowerCase().includes(termo) || p.sistemaExterno.includes(termo),
+        )
+      : plataformas
+  }, [plataformas, busca])
 
-      <div className="p-5 space-y-6">
-        {erro && (
+  const primeiraCarga = carregando && plataformas.length === 0 && !erro
+
+  return (
+    <CartaoConsulta
+      cabecalho={
+        <>
+          <TituloConsulta
+            icone={<IconeCamadas />}
+            titulo="Plataformas cadastradas"
+            subtitulo="Disponíveis no seletor da aba Nova integração."
+          />
+          <BotaoAtualizar onClick={carregar} carregando={carregando} />
+        </>
+      }
+      filtros={
+        plataformas.length > 0 ? (
+          <div className="max-w-sm">
+            <CampoBusca
+              id="buscaPlataforma"
+              aria-label="Buscar plataforma"
+              placeholder="Buscar por identificador ou código…"
+              value={busca}
+              onChange={setBusca}
+            />
+          </div>
+        ) : undefined
+      }
+      rodape={
+        !erro && plataformas.length > 0 ? (
+          <RodapeContagem visiveis={visiveis.length} total={plataformas.length} />
+        ) : undefined
+      }
+    >
+      {erro ? (
+        <div className="p-5">
           <div className="rounded-md border border-red-300 bg-red-50 p-4">
             <p className="text-sm text-red-700">{erro}</p>
           </div>
-        )}
-
-        {!erro && !carregando && plataformas.length === 0 && (
-          <p className="text-sm text-slate-500">Nenhuma plataforma cadastrada.</p>
-        )}
-
-        {plataformas.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="py-2 pr-4 font-medium">Identificador</th>
-                  <th className="py-2 font-medium">Sistema externo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plataformas.map((p) => (
-                  <tr key={p.descricao} className="border-b border-slate-100 text-slate-700">
-                    <td className="py-2 pr-4">{p.descricao}</td>
-                    <td className="py-2 font-mono text-xs">{p.sistemaExterno}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      ) : primeiraCarga ? (
+        <Carregando />
+      ) : visiveis.length === 0 ? (
+        <EstadoVazio
+          icone={plataformas.length === 0 ? <IconeCamadas /> : <IconeLupa />}
+          texto={
+            plataformas.length === 0
+              ? 'Nenhuma plataforma cadastrada.'
+              : 'Nenhuma plataforma corresponde à busca.'
+          }
+        />
+      ) : (
+        <Tabela
+          colunas={[{ rotulo: 'Identificador', className: 'w-full' }, { rotulo: 'Sistema externo' }]}
+        >
+          {visiveis.map((p) => (
+            <Linha key={p.descricao}>
+              <Celula primeira>
+                <EtiquetaPlataforma nome={p.descricao} />
+              </Celula>
+              <Celula ultima className="whitespace-nowrap">
+                <Codigo>{p.sistemaExterno}</Codigo>
+              </Celula>
+            </Linha>
+          ))}
+        </Tabela>
+      )}
+    </CartaoConsulta>
   )
 }

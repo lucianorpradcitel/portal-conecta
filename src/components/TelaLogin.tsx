@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
-import { ApiError, entrarComGoogle } from '../services/api'
+import { ApiError, entrarComGoogle, entrarComSenhaDev } from '../services/api'
 
 interface Props {
   aoEntrar: () => void
@@ -34,6 +34,19 @@ export function TelaLogin({ aoEntrar, aviso }: Props) {
           ? e.message
           : 'Não foi possível falar com a API. Verifique se ela está no ar.',
       )
+    } finally {
+      setEntrando(false)
+    }
+  }
+
+  async function entrarSemGoogle() {
+    setEntrando(true)
+    setErro(null)
+    try {
+      await entrarComSenhaDev()
+      aoEntrar()
+    } catch (e: unknown) {
+      setErro(e instanceof ApiError ? e.message : 'Não foi possível falar com a API.')
     } finally {
       setEntrando(false)
     }
@@ -82,6 +95,19 @@ export function TelaLogin({ aoEntrar, aviso }: Props) {
                   )}
                 </div>
               </GoogleOAuthProvider>
+            )}
+
+            {/* Só no npm run dev: o Vite remove este bloco do build de produção. */}
+            {import.meta.env.DEV && !entrando && (
+              <div className="border-t border-slate-200 pt-4 text-center">
+                <button
+                  type="button"
+                  onClick={entrarSemGoogle}
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  Entrar sem Google (desenvolvimento)
+                </button>
+              </div>
             )}
 
             {erro && (

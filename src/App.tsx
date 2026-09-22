@@ -3,24 +3,34 @@ import { FormIntegracao } from './components/FormIntegracao'
 import { FormPlataforma } from './components/FormPlataforma'
 import { ListaIntegracoes } from './components/ListaIntegracoes'
 import { ListaPlataformas } from './components/ListaPlataformas'
+import { Monitoramento } from './components/Monitoramento'
 import { PainelSucesso } from './components/PainelSucesso'
 import { TelaLogin } from './components/TelaLogin'
 import { registrarExpiracao, sair, temSessao, usuarioDaSessao } from './services/api'
 import type { IntegracaoCriada } from './types/integracao'
+import { MenuUsuario } from './components/MenuUsuario'
 
-type Aba = 'integracao' | 'consulta' | 'plataformas'
+type Aba = 'monitoramento' | 'integracao' | 'consulta' | 'plataformas'
 
 const ABAS: { id: Aba; rotulo: string }[] = [
-  { id: 'integracao', rotulo: 'Nova integração' },
+  { id: 'monitoramento', rotulo: 'Monitoramento' },
   { id: 'consulta', rotulo: 'Integrações' },
+  { id: 'integracao', rotulo: 'Nova integração' },
   { id: 'plataformas', rotulo: 'Plataformas' },
 ]
+
+const LARGURA: Record<Aba, string> = {
+  monitoramento: 'max-w-7xl',
+  consulta: 'max-w-6xl',
+  integracao: 'max-w-4xl',
+  plataformas: 'max-w-4xl',
+}
 
 export default function App() {
   const [autenticado, setAutenticado] = useState(temSessao)
   const [avisoLogin, setAvisoLogin] = useState<string | null>(null)
 
-  const [aba, setAba] = useState<Aba>('integracao')
+  const [aba, setAba] = useState<Aba>('monitoramento')
   const [criada, setCriada] = useState<IntegracaoCriada | null>(null)
   // Contadores para as abas recarregarem o que a outra mudou.
   const [versaoLojistas, setVersaoLojistas] = useState(0)
@@ -41,6 +51,8 @@ export default function App() {
         aviso={avisoLogin}
         aoEntrar={() => {
           setAvisoLogin(null)
+          // Todo login começa pelo monitoramento.
+          setAba('monitoramento')
           setAutenticado(true)
         }}
       />
@@ -49,32 +61,27 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
-      <div className="mx-auto max-w-4xl space-y-6">
+      {/* As consultas têm tabelas largas; os formulários ficam estreitos. */}
+      <div className={`mx-auto space-y-6 ${LARGURA[aba]}`}>
         <header className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <img src="/conecta_logo.png" alt="Conecta" className="h-10 w-auto object-contain" />
             <div>
               <h1 className="text-xl font-semibold text-slate-800">Portal Conecta</h1>
               <p className="text-sm text-slate-500">
-                Cadastro de lojistas e integrações Conecta
+                Monitoramento e cadastro de integrações Conecta
               </p>
             </div>
           </div>
 
-          <div className="text-right">
-            <p className="text-sm text-slate-600">{usuarioDaSessao()}</p>
-            <button
-              type="button"
-              onClick={() => {
-                sair()
-                setAutenticado(false)
-                setAvisoLogin(null)
-              }}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-            >
-              Sair
-            </button>
-          </div>
+          <MenuUsuario
+            usuario={usuarioDaSessao()}
+            aoSair={() => {
+              sair()
+              setAutenticado(false)
+              setAvisoLogin(null)
+            }}
+          />
         </header>
 
         <nav className="border-b border-slate-200">
@@ -100,6 +107,9 @@ export default function App() {
             })}
           </div>
         </nav>
+
+        {/* Só monta quando aberto, para a atualização automática não rodar em segundo plano. */}
+        {aba === 'monitoramento' && <Monitoramento />}
 
         <div hidden={aba !== 'integracao'}>
           {criada ? (

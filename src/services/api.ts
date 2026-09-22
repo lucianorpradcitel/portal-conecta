@@ -106,6 +106,33 @@ export async function entrarComGoogle(idToken: string): Promise<void> {
   sessionStorage.setItem(CHAVE_TOKEN, corpo.token)
 }
 
+/**
+ * Só para desenvolvimento: entra pelo POST /Autenticar com o usuário do .env, para testar a tela
+ * quando o login Google não está disponível. Fora do `npm run dev` a função nem existe no bundle.
+ */
+export async function entrarComSenhaDev(): Promise<void> {
+  if (!import.meta.env.DEV) {
+    throw new Error('Login por senha só existe em desenvolvimento.')
+  }
+
+  const resposta = await fetch(`${BASE}/Autenticar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userName: import.meta.env.VITE_MONINT_USER,
+      senha: import.meta.env.VITE_MONINT_PASS,
+    }),
+  })
+
+  if (!resposta.ok) {
+    throw new ApiError(resposta.status, await mensagemDeErro(resposta))
+  }
+
+  const corpo = (await resposta.json()) as { token: string }
+  token = corpo.token
+  sessionStorage.setItem(CHAVE_TOKEN, corpo.token)
+}
+
 function derrubarSessao(): never {
   sair()
   aoExpirar?.()

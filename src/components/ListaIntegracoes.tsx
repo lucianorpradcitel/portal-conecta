@@ -1,20 +1,47 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, apiGet } from '../services/api'
-import type { IntegracaoResumo } from '../types/integracao'
-import { Botao } from './ui/Botao'
-import { Select } from './ui/Select'
+import type { IntegracaoResumo, PlataformaResumo } from '../types/integracao'
+import { PedidosDoCliente } from './PedidosDoCliente'
+import { IconeLink, IconeLupa } from './ui/Icones'
+import {
+  BotaoAtualizar,
+  BotaoLimpar,
+  CampoBusca,
+  Carregando,
+  CartaoConsulta,
+  Celula,
+  Codigo,
+  EstadoVazio,
+  EtiquetaPlataforma,
+  EtiquetaSituacao,
+  Linha,
+  RodapeContagem,
+  SelectFiltro,
+  Tabela,
+  TituloConsulta,
+} from './ui/Tabela'
 
 interface Props {
   /** Incrementado quando uma integração é criada na outra aba. */
   versao?: number
 }
 
-function formatarData(valor: string | null): string {
+function formatarData(valor: string | null): { data: string; hora: string } | null {
   if (!valor) {
-    return '—'
+    return null
   }
-  const data = new Date(valor)
-  return Number.isNaN(data.getTime()) ? valor : data.toLocaleString('pt-BR')
+  const d = new Date(valor)
+  if (Number.isNaN(d.getTime())) {
+    return { data: valor, hora: '' }
+  }
+  return {
+    data: d.toLocaleDateString('pt-BR'),
+    hora: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+  }
+}
+
+function normalizar(texto: string): string {
+  return texto.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
 }
 
 /**
@@ -22,13 +49,30 @@ function formatarData(valor: string | null): string {
  * nem de desativação — hoje isso é UPDATE direto no banco.
  *
  * Usa o GET /integracoes sem incluirCredenciais, então nenhum segredo trafega até aqui.
+ * Plataforma e situação filtram na API; a busca por texto filtra o que já veio.
  */
 export function ListaIntegracoes({ versao = 0 }: Props) {
   const [integracoes, setIntegracoes] = useState<IntegracaoResumo[]>([])
+  const [opcoesPlataforma, setOpcoesPlataforma] = useState<string[]>(['mercos', 'tray'])
   const [plataforma, setPlataforma] = useState('')
   const [ativo, setAtivo] = useState('')
+  const [busca, setBusca] = useState('')
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  /** Lojista cujos pedidos estão abertos. Enquanto aberto, a lista fica guardada com os filtros. */
+  const [clienteAberto, setClienteAberto] = useState<{ nome: string; codigo: number } | null>(null)
+
+  // O filtro de plataforma segue o cadastro (aba Plataformas). Se a consulta falhar, ficam as duas
+  // que a tela sempre ofereceu.
+  useEffect(() => {
+    apiGet<PlataformaResumo[]>('/plataformas')
+      .then((lista) => {
+        if (lista.length > 0) {
+          setOpcoesPlataforma(lista.map((p) => p.descricao).sort())
+        }
+      })
+      .catch(() => {})
+  }, [versao])
 
   const carregar = useCallback(() => {
     const parametros = new URLSearchParams()
@@ -55,98 +99,162 @@ export function ListaIntegracoes({ versao = 0 }: Props) {
     carregar()
   }, [carregar, versao])
 
+  const visiveis = useMemo(() => {
+    const termo = normalizar(busca.trim())
+    if (!termo) {
+      return integracoes
+    }
+    return integracoes.filter((i) =>
+      [i.codigoIntegracao, i.nomeCliente, String(i.codigoCliente)].some((campo) =>
+        normalizar(campo ?? '').includes(termo),
+      ),
+    )
+  }, [integracoes, busca])
+
+  const temFiltro = Boolean(plataforma || ativo || busca)
+  const primeiraCarga = carregando && integracoes.length === 0 && !erro
+
+  if (clienteAberto) {
+    return (
+      <PedidosDoCliente
+        nomeCliente={clienteAberto.nome}
+        codigoCliente={clienteAberto.codigo}
+        aoVoltar={() => setClienteAberto(null)}
+      />
+    )
+  }
+
+  function limpar() {
+    setPlataforma('')
+    setAtivo('')
+    setBusca('')
+  }
+
   return (
-    <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-      <div className="p-5 border-b border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-800">Integrações cadastradas</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          
-        </p>
-      </div>
-
-      <div className="p-5 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-          <Select
+    <CartaoConsulta
+      cabecalho={
+        <>
+          <TituloConsulta
+            icone={<IconeLink />}
+            titulo="Integrações cadastradas"
+            subtitulo="Lojistas conectados às plataformas."
+          />
+          <BotaoAtualizar onClick={carregar} carregando={carregando} />
+        </>
+      }
+      filtros={
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_auto] gap-3 items-center">
+          <CampoBusca
+            id="buscaIntegracao"
+            aria-label="Buscar"
+            placeholder="Buscar por código ou lojista…"
+            value={busca}
+            onChange={setBusca}
+          />
+          <SelectFiltro
             id="filtroPlataforma"
-            label="Plataforma"
+            aria-label="Plataforma"
             value={plataforma}
-            onChange={(e) => setPlataforma(e.target.value)}
+            onChange={setPlataforma}
           >
-            <option value="">Todas</option>
-            <option value="tray">Tray</option>
-            <option value="mercos">Mercos</option>
-          </Select>
-
-          <Select
-            id="filtroAtivo"
-            label="Situação"
-            value={ativo}
-            onChange={(e) => setAtivo(e.target.value)}
-          >
-            <option value="">Todas</option>
+            <option value="">Todas as plataformas</option>
+            {opcoesPlataforma.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </SelectFiltro>
+          <SelectFiltro id="filtroAtivo" aria-label="Situação" value={ativo} onChange={setAtivo}>
+            <option value="">Todas as situações</option>
             <option value="S">Ativas</option>
             <option value="N">Inativas</option>
-          </Select>
-
-          <Botao type="button" variante="secundario" onClick={carregar} disabled={carregando}>
-            {carregando ? 'Carregando…' : 'Atualizar'}
-          </Botao>
+          </SelectFiltro>
+          <BotaoLimpar onClick={limpar} disabled={!temFiltro} />
         </div>
-
-        {erro && (
+      }
+      rodape={
+        !erro && integracoes.length > 0 ? (
+          <RodapeContagem visiveis={visiveis.length} total={integracoes.length} />
+        ) : undefined
+      }
+    >
+      {erro ? (
+        <div className="p-5">
           <div className="rounded-md border border-red-300 bg-red-50 p-4">
             <p className="text-sm text-red-700">{erro}</p>
           </div>
-        )}
-
-        {!erro && !carregando && integracoes.length === 0 && (
-          <p className="text-sm text-slate-500">Nenhuma integração encontrada com esses filtros.</p>
-        )}
-
-        {integracoes.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="py-2 pr-4 font-medium">Código</th>
-                  <th className="py-2 pr-4 font-medium">Lojista</th>
-                  <th className="py-2 pr-4 font-medium">Plataforma</th>
-                  <th className="py-2 pr-4 font-medium">Slug</th>
-                  <th className="py-2 pr-4 font-medium">Situação</th>
-                  <th className="py-2 font-medium">Cadastrada em</th>
-                </tr>
-              </thead>
-              <tbody>
-                {integracoes.map((i) => (
-                  <tr
-                    key={`${i.codigoIntegracao}-${i.codigoCliente}`}
-                    className="border-b border-slate-100 text-slate-700"
+        </div>
+      ) : primeiraCarga ? (
+        <Carregando />
+      ) : visiveis.length === 0 ? (
+        <EstadoVazio
+          icone={<IconeLupa />}
+          texto={
+            integracoes.length === 0
+              ? 'Nenhuma integração encontrada com esses filtros.'
+              : 'Nenhuma integração corresponde à busca.'
+          }
+          acao={
+            temFiltro && (
+              <button
+                type="button"
+                onClick={limpar}
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                Limpar filtros
+              </button>
+            )
+          }
+        />
+      ) : (
+        <Tabela
+          colunas={[
+            { rotulo: 'Código' },
+            { rotulo: 'Lojista', className: 'w-full' },
+            { rotulo: 'Plataforma' },
+            { rotulo: 'Situação' },
+            { rotulo: 'Cadastrada em' },
+          ]}
+        >
+          {visiveis.map((i) => {
+            const quando = formatarData(i.dataInclusao)
+            return (
+              <Linha key={`${i.codigoIntegracao}-${i.codigoCliente}`}>
+                <Celula primeira className="whitespace-nowrap">
+                  <Codigo>{i.codigoIntegracao}</Codigo>
+                </Celula>
+                <Celula className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => setClienteAberto({ nome: i.nomeCliente, codigo: i.codigoCliente })}
+                    title="Ver pedidos deste lojista"
+                    className="font-medium text-slate-800 hover:text-indigo-600 hover:underline underline-offset-2"
                   >
-                    <td className="py-2 pr-4 font-mono text-xs">{i.codigoIntegracao}</td>
-                    <td className="py-2 pr-4">
-                      {i.nomeCliente} <span className="text-slate-400">#{i.codigoCliente}</span>
-                    </td>
-                    <td className="py-2 pr-4">{i.plataforma}</td>
-                    <td className="py-2 pr-4">{i.slug}</td>
-                    <td className="py-2 pr-4">
-                      <span
-                        className={
-                          i.ativo
-                            ? 'rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700'
-                            : 'rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600'
-                        }
-                      >
-                        {i.ativo ? 'Ativa' : 'Inativa'}
-                      </span>
-                    </td>
-                    <td className="py-2">{formatarData(i.dataInclusao)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+                    {i.nomeCliente}
+                  </button>
+                  <span className="ml-1.5 text-xs text-slate-400 tabular-nums">#{i.codigoCliente}</span>
+                </Celula>
+                <Celula className="whitespace-nowrap">
+                  <EtiquetaPlataforma nome={i.plataforma} />
+                </Celula>
+                <Celula className="whitespace-nowrap">
+                  <EtiquetaSituacao ativo={i.ativo} />
+                </Celula>
+                <Celula ultima className="whitespace-nowrap tabular-nums">
+                  {quando ? (
+                    <>
+                      <div className="text-slate-700">{quando.data}</div>
+                      <div className="text-xs text-slate-400">{quando.hora}</div>
+                    </>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </Celula>
+              </Linha>
+            )
+          })}
+        </Tabela>
+      )}
+    </CartaoConsulta>
   )
 }
