@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
+import type { CSSProperties, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
 import { IconeAtualizar, IconeLupa, IconeX } from './Icones'
 
 /*
@@ -24,16 +24,26 @@ function corDaPlataforma(nome: string): string {
   return CORES_PLATAFORMA[hash % CORES_PLATAFORMA.length]
 }
 
-/** Cores oficiais das marcas: principal, secundária e a cor do texto (legível sobre fundo claro). */
-const MARCAS: { chave: string; principal: string; secundaria: string; texto: string }[] = [
-  { chave: 'cilia', principal: '#0468F0', secundaria: '#2B2B2B', texto: '#0453BF' },
-  { chave: 'tray', principal: '#46A4D6', secundaria: '#02306E', texto: '#02306E' },
-  { chave: 'shopify', principal: '#95BF47', secundaria: '#5E8E3E', texto: '#4B7A2F' },
-  { chave: 'climba', principal: '#5FD33A', secundaria: '#1C1C3A', texto: '#1C1C3A' },
-  { chave: 'shoppub', principal: '#78B52C', secundaria: '#545663', texto: '#545663' },
-  { chave: 'nuvemshop', principal: '#4A6FB5', secundaria: '#2C3357', texto: '#2C3357' },
-  { chave: 'mercos', principal: '#03C95E', secundaria: '#663990', texto: '#663990' },
-  { chave: 'convertize', principal: '#F05A38', secundaria: '#263845', texto: '#C7401F' },
+/**
+ * Cores oficiais das marcas. "texto" é para fundo claro; no modo escuro valem os tons "Escuro",
+ * porque o azul-marinho, o roxo e o preto das marcas somem sobre o grafite.
+ */
+const MARCAS: {
+  chave: string
+  principal: string
+  secundaria: string
+  texto: string
+  secundariaEscuro: string
+  textoEscuro: string
+}[] = [
+  { chave: 'cilia', principal: '#0468F0', secundaria: '#2B2B2B', texto: '#0453BF', secundariaEscuro: '#D4D4D8', textoEscuro: '#5EA2FF' },
+  { chave: 'tray', principal: '#46A4D6', secundaria: '#02306E', texto: '#02306E', secundariaEscuro: '#4F7BC8', textoEscuro: '#7CC4EC' },
+  { chave: 'shopify', principal: '#95BF47', secundaria: '#5E8E3E', texto: '#4B7A2F', secundariaEscuro: '#6FA34A', textoEscuro: '#AED36A' },
+  { chave: 'climba', principal: '#5FD33A', secundaria: '#1C1C3A', texto: '#1C1C3A', secundariaEscuro: '#C7C9E8', textoEscuro: '#8BE36C' },
+  { chave: 'shoppub', principal: '#78B52C', secundaria: '#545663', texto: '#545663', secundariaEscuro: '#A3A6B4', textoEscuro: '#9ACD5C' },
+  { chave: 'nuvemshop', principal: '#4A6FB5', secundaria: '#2C3357', texto: '#2C3357', secundariaEscuro: '#9AA6CF', textoEscuro: '#94AEE3' },
+  { chave: 'mercos', principal: '#03C95E', secundaria: '#663990', texto: '#663990', secundariaEscuro: '#A77BD4', textoEscuro: '#C3A0E6' },
+  { chave: 'convertize', principal: '#F05A38', secundaria: '#263845', texto: '#C7401F', secundariaEscuro: '#9FB1BE', textoEscuro: '#FF8E70' },
 ]
 
 function marcaDaPlataforma(nome: string) {
@@ -48,7 +58,7 @@ export function EtiquetaPlataforma({ nome }: { nome?: string | null }) {
   const marca = marcaDaPlataforma(nome)
   if (!marca) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-inset ring-slate-200">
+      <span className="inline-flex items-center gap-1.5 rounded-md bg-surface px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-inset ring-slate-200">
         <span className={`h-1.5 w-1.5 rounded-full ${corDaPlataforma(nome)}`} />
         {nome}
       </span>
@@ -56,16 +66,21 @@ export function EtiquetaPlataforma({ nome }: { nome?: string | null }) {
   }
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
-      style={{
-        color: marca.texto,
-        backgroundColor: `${marca.principal}14`,
-        boxShadow: `inset 0 0 0 1px ${marca.principal}40`,
-      }}
+      className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--m-texto)] dark:text-[color:var(--m-texto-escuro)]"
+      style={
+        {
+          '--m-texto': marca.texto,
+          '--m-texto-escuro': marca.textoEscuro,
+          '--m-sec': marca.secundaria,
+          '--m-sec-escuro': marca.secundariaEscuro,
+          backgroundColor: `${marca.principal}1A`,
+          boxShadow: `inset 0 0 0 1px ${marca.principal}45`,
+        } as CSSProperties
+      }
     >
       <span className="flex -space-x-0.5" aria-hidden="true">
-        <span className="h-2 w-2 rounded-full ring-1 ring-white" style={{ backgroundColor: marca.principal }} />
-        <span className="h-2 w-2 rounded-full ring-1 ring-white" style={{ backgroundColor: marca.secundaria }} />
+        <span className="h-2 w-2 rounded-full ring-1 ring-surface" style={{ backgroundColor: marca.principal }} />
+        <span className="h-2 w-2 rounded-full bg-[color:var(--m-sec)] ring-1 ring-surface dark:bg-[color:var(--m-sec-escuro)]" />
       </span>
       {nome}
     </span>
@@ -100,7 +115,7 @@ export function CartaoConsulta({
   children: ReactNode
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
       <div className="group flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
         {cabecalho}
       </div>
@@ -147,7 +162,7 @@ export function RodapeContagem({ visiveis, total }: { visiveis: number; total: n
 }
 
 const CLASSE_CAMPO_FILTRO =
-  'block h-9 w-full rounded-lg border-slate-200 bg-white text-sm shadow-soft transition duration-150 placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15'
+  'block h-9 w-full rounded-lg border-slate-200 bg-surface text-sm shadow-soft transition duration-150 placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15'
 
 export function CampoBusca({
   onChange,
@@ -192,7 +207,7 @@ export function BotaoLimpar({ onClick, disabled }: { onClick: () => void; disabl
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-white hover:text-red-600 hover:shadow-soft active:scale-[0.97] disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent disabled:hover:shadow-none disabled:active:scale-100"
+      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-medium text-slate-600 transition-all duration-150 hover:bg-surface hover:text-red-600 hover:shadow-soft active:scale-[0.97] disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent disabled:hover:shadow-none disabled:active:scale-100"
     >
       <span className="h-4 w-4">
         <IconeX />
@@ -208,7 +223,7 @@ export function BotaoAtualizar({ onClick, carregando }: { onClick: () => void; c
       type="button"
       onClick={onClick}
       disabled={carregando}
-      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-soft transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:text-slate-400 disabled:active:scale-100"
+      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-medium text-slate-700 shadow-soft transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:text-slate-400 disabled:active:scale-100"
     >
       <span className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`}>
         <IconeAtualizar />

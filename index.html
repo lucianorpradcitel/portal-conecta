@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/conecta_logo.ico" />
     <title>Portal Conecta | Onboarding</title>
+    <script>
+      // Aplica o tema antes do primeiro desenho, para a tela não piscar branca no modo escuro.
+      try {
+        var t = localStorage.getItem('conecta.tema')
+        if (t === 'escuro' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark')
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

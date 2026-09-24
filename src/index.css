@@ -1,16 +1,23 @@
+@import './tema.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
+    color-scheme: light;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
     @apply bg-slate-50 text-slate-900 font-sans;
     font-feature-settings: 'ss01', 'cv11';
+    transition: background-color 0.2s ease;
   }
   ::selection {
     @apply bg-brand-100 text-brand-900;
@@ -39,10 +46,10 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: rgb(var(--slate-300));
   border-radius: 10px;
-  border: 2px solid #f8fafc;
+  border: 2px solid rgb(var(--slate-50));
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgb(var(--slate-400));
 }

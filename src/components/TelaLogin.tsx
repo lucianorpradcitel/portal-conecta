@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google'
 import { ApiError, entrarComGoogle, entrarComSenhaDev } from '../services/api'
 import { Alerta } from './ui/Alerta'
+import { AlternarTema } from './ui/AlternarTema'
 import { IconeAtividade, IconeEscudo, IconeRaio } from './ui/Icones'
 
 interface Props {
@@ -73,9 +74,9 @@ export function TelaLogin({ aoEntrar, aviso }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-surface">
       {/* Painel da marca: só em telas largas. */}
-      <aside className="relative hidden w-[46%] max-w-[640px] flex-col justify-between overflow-hidden bg-ink-900 p-12 lg:flex">
+      <aside className="escuro-fixo relative hidden w-[46%] max-w-[640px] flex-col justify-between overflow-hidden bg-ink-900 p-12 lg:flex">
         <div className="bg-grade mascara-radial pointer-events-none absolute inset-0" />
         <img
           src="/conecta_logo.png"
@@ -128,7 +129,10 @@ export function TelaLogin({ aoEntrar, aviso }: Props) {
       </aside>
 
       {/* Acesso */}
-      <main className="flex flex-1 items-center justify-center bg-slate-50 px-6 py-12 lg:bg-white">
+      <main className="relative flex flex-1 items-center justify-center bg-slate-50 px-6 py-12 lg:bg-surface">
+        <div className="absolute right-6 top-6">
+          <AlternarTema />
+        </div>
         <div className="w-full max-w-[380px] animate-fade-in">
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <img src="/conecta_logo.png" alt="Conecta" className="h-9 w-auto object-contain" />
@@ -181,7 +185,7 @@ export function TelaLogin({ aoEntrar, aviso }: Props) {
                 <button
                   type="button"
                   onClick={entrarSemGoogle}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 shadow-soft transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.99]"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-slate-200 bg-surface text-sm font-medium text-slate-700 shadow-soft transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-[0.99]"
                 >
                   Entrar sem Google
                 </button>

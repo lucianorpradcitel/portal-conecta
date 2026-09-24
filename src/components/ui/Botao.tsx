@@ -8,9 +8,9 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const ESTILOS: Record<Variante, string> = {
   primario:
-    'bg-ink-900 text-white shadow-[0_1px_2px_rgb(16_24_40/0.2),inset_0_1px_0_rgb(255_255_255/0.08)] hover:bg-ink-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none',
+    'bg-ink-900 text-white shadow-[0_1px_2px_rgb(16_24_40/0.2),inset_0_1px_0_rgb(255_255_255/0.08)] hover:bg-ink-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none dark:bg-brand-500 dark:text-ink-950 dark:hover:bg-brand-400 dark:disabled:bg-slate-200 dark:disabled:text-slate-400',
   secundario:
-    'bg-white text-slate-700 shadow-soft border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:text-slate-400 disabled:hover:bg-white',
+    'bg-surface text-slate-700 shadow-soft border border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:text-slate-400 disabled:hover:bg-surface',
 }
 
 export function Botao({ variante = 'primario', className = '', ...props }: Props) {

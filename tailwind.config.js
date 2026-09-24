@@ -1,6 +1,12 @@
+// Os tons vêm de variáveis CSS (src/tema.css), que trocam de valor no modo escuro.
+const TONS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
+const variavel = (nome) =>
+  Object.fromEntries(TONS.map((t) => [t, `rgb(var(--${nome}-${t}) / <alpha-value>)`]))
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -9,20 +15,16 @@ export default {
         mono: ['"Geist Mono Variable"', 'ui-monospace', 'SFMono-Regular', 'Consolas', 'monospace'],
       },
       colors: {
-        // Azul da logo (#03A9E5) como cor de marca.
-        brand: {
-          50: '#ECF9FE',
-          100: '#D3F0FC',
-          200: '#A8E1F9',
-          300: '#6FCDF4',
-          400: '#2FB8EC',
-          500: '#03A9E5',
-          600: '#0288C2',
-          700: '#056C9C',
-          800: '#0A5A80',
-          900: '#0E4B6A',
-          950: '#082F45',
-        },
+        // Azul da logo (#03A9E5) como cor de marca; valores em src/tema.css.
+        brand: variavel('brand'),
+        slate: variavel('slate'),
+        red: variavel('red'),
+        emerald: variavel('emerald'),
+        amber: variavel('amber'),
+        sky: variavel('sky'),
+        violet: variavel('violet'),
+        // Fundo de cards e campos: branco no claro, grafite no escuro.
+        surface: 'rgb(var(--surface) / <alpha-value>)',
         // Verde da logo, usado só como sinal de "ao vivo".
         signal: '#00E696',
         ink: {

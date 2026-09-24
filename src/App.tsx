@@ -9,6 +9,7 @@ import { TelaLogin } from './components/TelaLogin'
 import { registrarExpiracao, sair, temSessao, usuarioDaSessao } from './services/api'
 import type { IntegracaoCriada } from './types/integracao'
 import { MenuUsuario } from './components/MenuUsuario'
+import { AlternarTema } from './components/ui/AlternarTema'
 import { IconeAtividade, IconeCamadas, IconeLink, IconeMais } from './components/ui/Icones'
 
 type Aba = 'monitoramento' | 'integracao' | 'consulta' | 'plataformas'
@@ -92,7 +93,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 lg:pl-64">
-      <aside className="bg-ink-900 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:w-64 lg:flex-col">
+      <aside className="escuro-fixo bg-ink-900 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-white/[0.06]">
         <div className="flex h-16 items-center justify-between gap-3 px-5 lg:border-b lg:border-white/[0.06]">
           <div className="flex items-center gap-3">
             <img src="/conecta_logo.png" alt="Conecta" className="h-8 w-auto object-contain" />
@@ -101,7 +102,8 @@ export default function App() {
               <p className="text-[11px] font-medium text-slate-500">Integrações Citel</p>
             </div>
           </div>
-          <div className="lg:hidden">
+          <div className="flex items-center gap-1 lg:hidden">
+            <AlternarTema escuroFixo />
             <MenuUsuario usuario={usuario} aoSair={sairDoPortal} compacto />
           </div>
         </div>
@@ -151,7 +153,8 @@ export default function App() {
           })}
         </nav>
 
-        <div className="hidden border-t border-white/[0.06] p-3 lg:block">
+        <div className="hidden space-y-1 border-t border-white/[0.06] p-3 lg:block">
+          <AlternarTema escuroFixo comRotulo />
           <MenuUsuario usuario={usuario} aoSair={sairDoPortal} />
         </div>
       </aside>

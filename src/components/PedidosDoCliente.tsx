@@ -140,7 +140,7 @@ export function PedidosDoCliente({ nomeCliente, codigoCliente, aoVoltar }: Props
           <button
             type="button"
             onClick={aoVoltar}
-            className="group inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-soft transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97]"
+            className="group inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-surface px-3 text-sm font-medium text-slate-700 shadow-soft transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97]"
           >
             <span className="h-4 w-4 transition-transform duration-150 group-hover:-translate-x-0.5">
               <IconeVoltar />
@@ -368,7 +368,7 @@ function CartaoStatus({
       type="button"
       onClick={aoClicar}
       aria-pressed={ativo}
-      className={`group flex items-center gap-3 rounded-xl border bg-white p-4 text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover active:translate-y-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/20 ${
+      className={`group flex items-center gap-3 rounded-xl border bg-surface p-4 text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover active:translate-y-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/20 ${
         ativo ? 'border-brand-500 ring-4 ring-brand-500/10' : 'border-slate-200/80 hover:border-slate-300'
       }`}
     >
@@ -397,7 +397,7 @@ function Paginacao({
   aoMudar: (p: number) => void
 }) {
   const botao =
-    'inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-sm font-medium text-slate-600 shadow-soft transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:cursor-not-allowed disabled:text-slate-300 disabled:shadow-none disabled:hover:bg-white disabled:active:scale-100'
+    'inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg border border-slate-200 bg-surface px-2 text-sm font-medium text-slate-600 shadow-soft transition-all duration-150 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:cursor-not-allowed disabled:text-slate-300 disabled:shadow-none disabled:hover:bg-surface disabled:active:scale-100'
   return (
     <div className="flex items-center gap-1.5">
       <button type="button" className={botao} onClick={() => aoMudar(1)} disabled={pagina === 1} aria-label="Primeira página">

@@ -195,7 +195,7 @@ export function FormIntegracao({ aoCriar, versaoLojistas, versaoPlataformas, aoC
     <form
       onSubmit={enviar}
       noValidate
-      className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card"
+      className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card"
     >
       <div className="divide-y divide-slate-100">
         <Secao
@@ -219,7 +219,7 @@ export function FormIntegracao({ aoCriar, versaoLojistas, versaoPlataformas, aoC
                 onClick={() => trocarModoLojista(modo)}
                 className={`rounded-md px-3.5 py-1.5 font-medium transition-all duration-150 disabled:cursor-not-allowed ${
                   modoLojista === modo
-                    ? 'bg-white text-slate-900 shadow-soft ring-1 ring-slate-200/80'
+                    ? 'bg-surface text-slate-900 shadow-soft ring-1 ring-slate-200/80 dark:bg-slate-200 dark:ring-slate-300/60'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >

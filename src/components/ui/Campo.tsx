@@ -11,7 +11,7 @@ interface Props extends InputHTMLAttributes<HTMLInputElement> {
 export const CLASSE_ROTULO = 'block text-[13px] font-medium text-slate-700'
 
 export function classeControle(erro?: string): string {
-  return `mt-1.5 block w-full rounded-lg bg-white text-slate-900 shadow-soft placeholder:text-slate-400 transition duration-150 focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 ${
+  return `mt-1.5 block w-full rounded-lg bg-surface text-slate-900 shadow-soft placeholder:text-slate-400 transition duration-150 focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 ${
     erro
       ? 'border-red-300 hover:border-red-400 focus:border-red-500 focus:ring-red-500/15'
       : 'border-slate-200 hover:border-slate-300 focus:border-brand-500 focus:ring-brand-500/15 disabled:hover:border-slate-200'

@@ -84,7 +84,7 @@ export function FormPlataforma({ aoCriar }: Props) {
     <form
       onSubmit={enviar}
       noValidate
-      className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card lg:sticky lg:top-10"
+      className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card lg:sticky lg:top-10"
     >
       <div className="group flex items-center gap-3 border-b border-slate-100 px-5 py-4">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 transition-transform duration-200 group-hover:scale-105">

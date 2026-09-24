@@ -24,7 +24,7 @@ export function PainelSucesso({ integracao, aoCadastrarOutra }: Props) {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card animate-fade-in">
+    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card animate-fade-in">
       <div className="flex items-start gap-4 border-b border-slate-100 px-6 py-6">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/60">
           <span className="h-5 w-5">
@@ -69,7 +69,7 @@ export function PainelSucesso({ integracao, aoCadastrarOutra }: Props) {
                 <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs text-amber-900">x-ct-token</code>.
               </p>
 
-              <div className="mt-4 flex items-stretch gap-2 rounded-lg bg-ink-900 p-1.5 pl-4 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]">
+              <div className="escuro-fixo mt-4 flex items-stretch gap-2 rounded-lg bg-ink-900 p-1.5 pl-4 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]">
                 <code className="flex min-w-0 flex-1 items-center break-all py-1.5 font-mono text-xs text-brand-200">
                   {integracao.webhookToken}
                 </code>
@@ -103,7 +103,7 @@ export function PainelSucesso({ integracao, aoCadastrarOutra }: Props) {
 
 function Dado({ rotulo, children }: { rotulo: string; children: ReactNode }) {
   return (
-    <div className="bg-white px-4 py-3.5">
+    <div className="bg-surface px-4 py-3.5">
       <dt className="text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">{rotulo}</dt>
       <dd className="mt-1.5">{children}</dd>
     </div>

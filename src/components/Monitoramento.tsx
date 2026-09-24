@@ -187,7 +187,7 @@ export function Monitoramento() {
 
   if (carregando) {
     return (
-      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-card">
+      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
         <Carregando />
       </div>
     )
@@ -247,7 +247,7 @@ export function Monitoramento() {
                     onClick={() => trocarSubAba(id)}
                     className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-sm font-medium transition-all duration-150 ${
                       ativa
-                        ? 'bg-white text-slate-900 shadow-soft ring-1 ring-slate-200/80'
+                        ? 'bg-surface text-slate-900 shadow-soft ring-1 ring-slate-200/80 dark:bg-slate-200 dark:ring-slate-300/60'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
@@ -419,7 +419,7 @@ function CartaoResumo({
   destaque?: boolean
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
+    <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-surface p-5 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
       {destaque && <span className="absolute inset-x-0 top-0 h-[3px] bg-red-500" />}
       <div className="flex items-start justify-between gap-3">
         <p className="text-[13px] font-medium text-slate-500">{rotulo}</p>
