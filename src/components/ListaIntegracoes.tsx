@@ -1,0 +1,266 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ApiError, apiGet } from '../services/api'
+import type { IntegracaoResumo, PlataformaResumo } from '../types/integracao'
+import { PedidosDoCliente } from './PedidosDoCliente'
+import { Alerta } from './ui/Alerta'
+import { IconeLink, IconeLupa, IconeSetaDireita } from './ui/Icones'
+import {
+  BotaoAtualizar,
+  BotaoLimpar,
+  CampoBusca,
+  Carregando,
+  CartaoConsulta,
+  Celula,
+  Codigo,
+  EstadoVazio,
+  EtiquetaPlataforma,
+  EtiquetaSituacao,
+  Linha,
+  RodapeContagem,
+  SelectFiltro,
+  Tabela,
+  TituloConsulta,
+} from './ui/Tabela'
+
+interface Props {
+  /** Incrementado quando uma integração é criada na outra aba. */
+  versao?: number
+}
+
+function formatarData(valor: string | null): { data: string; hora: string } | null {
+  if (!valor) {
+    return null
+  }
+  const d = new Date(valor)
+  if (Number.isNaN(d.getTime())) {
+    return { data: valor, hora: '' }
+  }
+  return {
+    data: d.toLocaleDateString('pt-BR'),
+    hora: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+  }
+}
+
+function normalizar(texto: string): string {
+  return texto.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+}
+
+/**
+ * Consulta das integrações cadastradas. Somente leitura: a API ainda não tem endpoint de edição
+ * nem de desativação — hoje isso é UPDATE direto no banco.
+ *
+ * Usa o GET /integracoes sem incluirCredenciais, então nenhum segredo trafega até aqui.
+ * Plataforma e situação filtram na API; a busca por texto filtra o que já veio.
+ */
+export function ListaIntegracoes({ versao = 0 }: Props) {
+  const [integracoes, setIntegracoes] = useState<IntegracaoResumo[]>([])
+  const [opcoesPlataforma, setOpcoesPlataforma] = useState<string[]>(['mercos', 'tray'])
+  const [plataforma, setPlataforma] = useState('')
+  const [ativo, setAtivo] = useState('')
+  const [busca, setBusca] = useState('')
+  const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
+  /** Lojista cujos pedidos estão abertos. Enquanto aberto, a lista fica guardada com os filtros. */
+  const [clienteAberto, setClienteAberto] = useState<{ nome: string; codigo: number } | null>(null)
+
+  // O filtro de plataforma segue o cadastro (aba Plataformas). Se a consulta falhar, ficam as duas
+  // que a tela sempre ofereceu.
+  useEffect(() => {
+    apiGet<PlataformaResumo[]>('/plataformas')
+      .then((lista) => {
+        if (lista.length > 0) {
+          setOpcoesPlataforma(lista.map((p) => p.descricao).sort())
+        }
+      })
+      .catch(() => {})
+  }, [versao])
+
+  const carregar = useCallback(() => {
+    const parametros = new URLSearchParams()
+    if (plataforma) {
+      parametros.set('plataforma', plataforma)
+    }
+    if (ativo) {
+      parametros.set('ativo', ativo)
+    }
+    const query = parametros.toString()
+
+    setCarregando(true)
+    setErro(null)
+
+    return apiGet<IntegracaoResumo[]>(`/integracoes${query ? `?${query}` : ''}`)
+      .then(setIntegracoes)
+      .catch((e: unknown) => {
+        setErro(e instanceof ApiError ? e.message : 'Não foi possível carregar as integrações.')
+      })
+      .finally(() => setCarregando(false))
+  }, [plataforma, ativo])
+
+  useEffect(() => {
+    carregar()
+  }, [carregar, versao])
+
+  const visiveis = useMemo(() => {
+    const termo = normalizar(busca.trim())
+    const filtradas = termo
+      ? integracoes.filter((i) =>
+          [i.codigoIntegracao, i.nomeCliente, String(i.codigoCliente)].some((campo) =>
+            normalizar(campo ?? '').includes(termo),
+          ),
+        )
+      : integracoes
+    return [...filtradas].sort((a, b) =>
+      (a.nomeCliente ?? '').localeCompare(b.nomeCliente ?? '', 'pt-BR', { sensitivity: 'base', numeric: true }),
+    )
+  }, [integracoes, busca])
+
+  const temFiltro = Boolean(plataforma || ativo || busca)
+  const primeiraCarga = carregando && integracoes.length === 0 && !erro
+
+  if (clienteAberto) {
+    return (
+      <PedidosDoCliente
+        nomeCliente={clienteAberto.nome}
+        codigoCliente={clienteAberto.codigo}
+        aoVoltar={() => setClienteAberto(null)}
+      />
+    )
+  }
+
+  function limpar() {
+    setPlataforma('')
+    setAtivo('')
+    setBusca('')
+  }
+
+  return (
+    <CartaoConsulta
+      cabecalho={
+        <>
+          <TituloConsulta
+            icone={<IconeLink />}
+            titulo="Integrações cadastradas"
+            subtitulo="Lojistas conectados às plataformas."
+          />
+          <BotaoAtualizar onClick={carregar} carregando={carregando} />
+        </>
+      }
+      filtros={
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_auto] gap-3 items-center">
+          <CampoBusca
+            id="buscaIntegracao"
+            aria-label="Buscar"
+            placeholder="Buscar por código ou lojista…"
+            value={busca}
+            onChange={setBusca}
+          />
+          <SelectFiltro
+            id="filtroPlataforma"
+            aria-label="Plataforma"
+            value={plataforma}
+            onChange={setPlataforma}
+          >
+            <option value="">Todas as plataformas</option>
+            {opcoesPlataforma.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </SelectFiltro>
+          <SelectFiltro id="filtroAtivo" aria-label="Situação" value={ativo} onChange={setAtivo}>
+            <option value="">Todas as situações</option>
+            <option value="S">Ativas</option>
+            <option value="N">Inativas</option>
+          </SelectFiltro>
+          <BotaoLimpar onClick={limpar} disabled={!temFiltro} />
+        </div>
+      }
+      rodape={
+        !erro && integracoes.length > 0 ? (
+          <RodapeContagem visiveis={visiveis.length} total={integracoes.length} />
+        ) : undefined
+      }
+    >
+      {erro ? (
+        <div className="p-5">
+          <Alerta tom="erro" titulo="Não foi possível carregar">
+            {erro}
+          </Alerta>
+        </div>
+      ) : primeiraCarga ? (
+        <Carregando />
+      ) : visiveis.length === 0 ? (
+        <EstadoVazio
+          icone={<IconeLupa />}
+          texto={
+            integracoes.length === 0
+              ? 'Nenhuma integração encontrada com esses filtros.'
+              : 'Nenhuma integração corresponde à busca.'
+          }
+          acao={
+            temFiltro && (
+              <button
+                type="button"
+                onClick={limpar}
+                className="text-sm font-medium text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline"
+              >
+                Limpar filtros
+              </button>
+            )
+          }
+        />
+      ) : (
+        <Tabela
+          colunas={[
+            { rotulo: 'Código' },
+            { rotulo: 'Lojista', className: 'w-full' },
+            { rotulo: 'Plataforma' },
+            { rotulo: 'Situação' },
+            { rotulo: 'Cadastrada em' },
+          ]}
+        >
+          {visiveis.map((i) => {
+            const quando = formatarData(i.dataInclusao)
+            return (
+              <Linha key={`${i.codigoIntegracao}-${i.codigoCliente}`}>
+                <Celula primeira className="whitespace-nowrap">
+                  <Codigo>{i.codigoIntegracao}</Codigo>
+                </Celula>
+                <Celula className="whitespace-nowrap">
+                  <button
+                    type="button"
+                    onClick={() => setClienteAberto({ nome: i.nomeCliente, codigo: i.codigoCliente })}
+                    title="Ver pedidos deste lojista"
+                    className="group/lojista inline-flex items-center gap-1 font-medium text-slate-900 transition-colors hover:text-brand-700"
+                  >
+                    {i.nomeCliente}
+                    <span className="h-3.5 w-3.5 -translate-x-1 text-brand-600 opacity-0 transition-all duration-150 group-hover/lojista:translate-x-0 group-hover/lojista:opacity-100">
+                      <IconeSetaDireita />
+                    </span>
+                  </button>
+                  <span className="ml-1.5 text-xs text-slate-400 tabular-nums">#{i.codigoCliente}</span>
+                </Celula>
+                <Celula className="whitespace-nowrap">
+                  <EtiquetaPlataforma nome={i.plataforma} />
+                </Celula>
+                <Celula className="whitespace-nowrap">
+                  <EtiquetaSituacao ativo={i.ativo} />
+                </Celula>
+                <Celula ultima className="whitespace-nowrap tabular-nums">
+                  {quando ? (
+                    <>
+                      <div className="text-slate-700">{quando.data}</div>
+                      <div className="text-xs text-slate-400">{quando.hora}</div>
+                    </>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </Celula>
+              </Linha>
+            )
+          })}
+        </Tabela>
+      )}
+    </CartaoConsulta>
+  )
+}

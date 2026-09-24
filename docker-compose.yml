@@ -1,0 +1,28 @@
+services:
+  conecta-onboarding:
+    build:
+      context: .
+      args:
+        # Públicas por design — o Vite inlina estes valores no bundle.
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        VITE_API_TARGET: ${VITE_API_TARGET}
+        VITE_MONINT_USER: ${VITE_MONINT_USER}
+        VITE_MONINT_PASS: ${VITE_MONINT_PASS}
+    pull_policy: build
+    container_name: conecta-onboarding
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=network_traefik"
+      - "traefik.http.routers.conecta-onboarding-router.rule=Host(`conecta.citel.app`)"
+      - "traefik.http.routers.conecta-onboarding-router.entrypoints=websecure"
+      - "traefik.http.routers.conecta-onboarding-router.tls=true"
+      - "traefik.http.routers.conecta-onboarding-router.tls.certresolver=tlschallenge"
+      - "traefik.http.services.conecta-onboarding-service.loadbalancer.server.port=80"
+    networks:
+      network_traefik:
+        ipv4_address: 172.20.0.11
+
+networks:
+  network_traefik:
+    external: true
