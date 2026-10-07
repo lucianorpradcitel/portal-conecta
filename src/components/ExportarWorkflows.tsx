@@ -72,9 +72,13 @@ function BotaoLinha({
 }
 
 /**
- * Escolhe a instância do n8n, filtra os workflows por cliente, base e/ou trecho do nome e monta a
- * lista final do que será exportado. Os nomes seguem Cliente_Base_Etapa (ex.: LAB_Mercos_Pedido_Captura),
- * então "base = Mercos" pega a Mercos de todos os clientes.
+ * Escolhe a instância do n8n, filtra os workflows por categoria, plataforma e/ou trecho do nome e monta
+ * a lista final do que será exportado. Os nomes seguem Categoria_Plataforma_Etapa (ex.:
+ * LAB_Mercos_Pedido_Captura), então "plataforma = Mercos" pega a Mercos de todas as categorias.
+ *
+ * Por dentro, a categoria ainda se chama `cliente` e a plataforma `base` (estado, parâmetros do
+ * webhook portal-wf e chaves da resposta). Só os textos da tela mudaram: renomear o contrato exigiria
+ * republicar o workflow do n8n sem ganho para quem usa.
  *
  * Há duas listas: o resultado do filtro (que muda a cada busca) e a lista para exportar (que
  * acumula entre buscas). O ZIP leva exatamente a segunda, identificada por ID.
@@ -276,12 +280,13 @@ export function ExportarWorkflows() {
         <div className="grid gap-4 sm:grid-cols-3">
           <Select
             id="filtro-cliente"
-            label="Cliente"
+            label="Categoria do workflow"
+            ajuda="Primeira parte do nome (ex.: MASTER, LAB)."
             value={filtros.cliente}
             disabled={!instancia || ocupado}
             onChange={(e) => alterar('cliente', e.target.value)}
           >
-            <option value="">{carregandoOpcoes ? 'Carregando…' : 'Todos os clientes'}</option>
+            <option value="">{carregandoOpcoes ? 'Carregando…' : 'Todas as categorias'}</option>
             {clientes.map((c) => (
               <option key={c.nome} value={c.nome}>
                 {c.nome} ({c.total})
@@ -291,12 +296,13 @@ export function ExportarWorkflows() {
 
           <Select
             id="filtro-base"
-            label="Base"
+            label="Plataforma"
+            ajuda="Segunda parte do nome (ex.: Tray, Mercos)."
             value={filtros.base}
             disabled={!instancia || ocupado}
             onChange={(e) => alterar('base', e.target.value)}
           >
-            <option value="">{carregandoOpcoes ? 'Carregando…' : 'Todas as bases'}</option>
+            <option value="">{carregandoOpcoes ? 'Carregando…' : 'Todas as plataformas'}</option>
             {bases.map((b) => (
               <option key={b.nome} value={b.nome}>
                 {b.nome} ({b.total})
@@ -307,6 +313,7 @@ export function ExportarWorkflows() {
           <Campo
             id="filtro-busca"
             label="O nome contém"
+            ajuda="Procura o trecho em qualquer parte do nome."
             placeholder="ex.: pedido"
             value={filtros.busca}
             disabled={!instancia || ocupado}
@@ -315,9 +322,9 @@ export function ExportarWorkflows() {
         </div>
 
         <p className="text-sm text-slate-500">
-          Os nomes seguem <code>Cliente_Base_Etapa</code>: em <code>LAB_Mercos_Pedido_Captura</code>, o cliente é{' '}
-          <code>LAB</code> e a base é <code>Mercos</code>. Os filtros se combinam; para pegar a Mercos de todos
-          os clientes, escolha só a base. Workflows arquivados não entram.
+          Os nomes seguem <code>Categoria_Plataforma_Etapa</code>: em <code>LAB_Mercos_Pedido_Captura</code>, a
+          categoria é <code>LAB</code> e a plataforma é <code>Mercos</code>. Os filtros se combinam; para pegar a
+          Mercos de todas as categorias, escolha só a plataforma. Workflows arquivados não entram.
         </p>
 
         <div className="grid gap-4 lg:grid-cols-2">

@@ -57,7 +57,7 @@ const ABAS: {
   {
     id: 'workflows',
     rotulo: 'Workflows',
-    descricao: 'Exportação dos workflows do n8n por instância e cliente. Restrito ao time de integrações.',
+    descricao: 'Exportação dos workflows do n8n por instância, categoria e plataforma. Restrito ao time de integrações.',
     Icone: IconeCaixa,
     somenteAdmin: true,
     recurso: 'workflows',
