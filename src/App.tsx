@@ -4,6 +4,7 @@ import { FormPlataforma } from './components/FormPlataforma'
 import { ListaIntegracoes } from './components/ListaIntegracoes'
 import { ListaPlataformas } from './components/ListaPlataformas'
 import { Monitoramento } from './components/Monitoramento'
+import { ErroNaTela } from './components/ui/ErroNaTela'
 import { PainelSucesso } from './components/PainelSucesso'
 import { TelaLogin } from './components/TelaLogin'
 import { ExportarWorkflows } from './components/ExportarWorkflows'
@@ -220,53 +221,55 @@ export default function App() {
             <p className="mt-1.5 max-w-2xl text-sm text-slate-500">{atual.descricao}</p>
           </header>
 
-          <div className={LARGURA[aba]}>
-            {/* Só monta quando aberto, para a atualização automática não rodar em segundo plano. */}
-            {aba === 'monitoramento' && (
-              <div className="animate-fade-in">
-                <Monitoramento />
-              </div>
-            )}
+          <ErroNaTela reiniciarCom={aba}>
+            <div className={LARGURA[aba]}>
+              {/* Só monta quando aberto, para a atualização automática não rodar em segundo plano. */}
+              {aba === 'monitoramento' && (
+                <div className="animate-fade-in">
+                  <Monitoramento />
+                </div>
+              )}
 
-            {/* Fica montado ao trocar de aba (não perde o que foi digitado), mas só para admin. */}
-            {admin && (
-              <div hidden={aba !== 'integracao'} className="animate-fade-in">
-                {criada ? (
-                  <PainelSucesso integracao={criada} aoCadastrarOutra={() => setCriada(null)} />
-                ) : (
-                  <FormIntegracao
-                    versaoLojistas={versaoLojistas}
-                    versaoPlataformas={versaoPlataformas}
-                    aoCriarLojista={() => setVersaoLojistas((v) => v + 1)}
-                    aoCriar={(integracao) => {
-                      setCriada(integracao)
-                      setVersaoIntegracoes((v) => v + 1)
-                    }}
-                  />
-                )}
-              </div>
-            )}
+              {/* Fica montado ao trocar de aba (não perde o que foi digitado), mas só para admin. */}
+              {admin && (
+                <div hidden={aba !== 'integracao'} className="animate-fade-in">
+                  {criada ? (
+                    <PainelSucesso integracao={criada} aoCadastrarOutra={() => setCriada(null)} />
+                  ) : (
+                    <FormIntegracao
+                      versaoLojistas={versaoLojistas}
+                      versaoPlataformas={versaoPlataformas}
+                      aoCriarLojista={() => setVersaoLojistas((v) => v + 1)}
+                      aoCriar={(integracao) => {
+                        setCriada(integracao)
+                        setVersaoIntegracoes((v) => v + 1)
+                      }}
+                    />
+                  )}
+                </div>
+              )}
 
-            {/* A consulta só monta quando aberta, para não buscar a lista à toa. */}
-            {aba === 'consulta' && (
-              <div className="animate-fade-in">
-                <ListaIntegracoes versao={versaoIntegracoes} />
-              </div>
-            )}
+              {/* A consulta só monta quando aberta, para não buscar a lista à toa. */}
+              {aba === 'consulta' && (
+                <div className="animate-fade-in">
+                  <ListaIntegracoes versao={versaoIntegracoes} />
+                </div>
+              )}
 
-            {admin && aba === 'plataformas' && (
-              <div className="grid items-start gap-6 animate-fade-in lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-                <FormPlataforma aoCriar={() => setVersaoPlataformas((v) => v + 1)} />
-                <ListaPlataformas versao={versaoPlataformas} />
-              </div>
-            )}
+              {admin && aba === 'plataformas' && (
+                <div className="grid items-start gap-6 animate-fade-in lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+                  <FormPlataforma aoCriar={() => setVersaoPlataformas((v) => v + 1)} />
+                  <ListaPlataformas versao={versaoPlataformas} />
+                </div>
+              )}
 
-            {admin && aba === 'workflows' && recursos.includes('workflows') && (
-              <div className="animate-fade-in">
-                <ExportarWorkflows />
-              </div>
-            )}
-          </div>
+              {admin && aba === 'workflows' && recursos.includes('workflows') && (
+                <div className="animate-fade-in">
+                  <ExportarWorkflows />
+                </div>
+              )}
+            </div>
+          </ErroNaTela>
         </div>
       </main>
       <Segredos />
