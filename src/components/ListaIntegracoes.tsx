@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ApiError, apiGet } from '../services/api'
-import type { IntegracaoResumo, PlataformaResumo } from '../types/integracao'
+import { ApiError, apiGet, ehAdmin } from '../services/api'
+import type { IntegracaoEdicao, IntegracaoResumo, PlataformaResumo } from '../types/integracao'
+import { ModalEditarIntegracao } from './ModalEditarIntegracao'
 import { PedidosDoCliente } from './PedidosDoCliente'
 import { Alerta } from './ui/Alerta'
-import { IconeLink, IconeLupa, IconeSetaDireita } from './ui/Icones'
+import { IconeEngrenagem, IconeLink, IconeLupa, IconeSetaDireita } from './ui/Icones'
 import {
   BotaoAtualizar,
   BotaoLimpar,
@@ -46,11 +47,13 @@ function normalizar(texto: string): string {
 }
 
 /**
- * Consulta das integrações cadastradas. Somente leitura: a API ainda não tem endpoint de edição
- * nem de desativação — hoje isso é UPDATE direto no banco.
+ * Consulta das integrações cadastradas, com a edição de webservice, URL da API e chave privada para
+ * admin (engrenagem em cada linha, que abre um popup). A desativação ainda não existe na API — hoje
+ * isso é UPDATE direto no banco.
  *
- * Usa o GET /integracoes sem incluirCredenciais, então nenhum segredo trafega até aqui.
- * Plataforma e situação filtram na API; a busca por texto filtra o que já veio.
+ * A lista usa o GET /integracoes sem incluirCredenciais, então nenhum segredo trafega até aqui: a
+ * chave privada só chega ao popup, pela rota de admin. Plataforma e situação filtram na API; a busca
+ * por texto filtra o que já veio.
  */
 export function ListaIntegracoes({ versao = 0 }: Props) {
   const [integracoes, setIntegracoes] = useState<IntegracaoResumo[]>([])
@@ -62,6 +65,12 @@ export function ListaIntegracoes({ versao = 0 }: Props) {
   const [erro, setErro] = useState<string | null>(null)
   /** Lojista cujos pedidos estão abertos. Enquanto aberto, a lista fica guardada com os filtros. */
   const [clienteAberto, setClienteAberto] = useState<{ nome: string; codigo: number } | null>(null)
+  /** Integração cujo popup de edição está aberto. */
+  const [emEdicao, setEmEdicao] = useState<IntegracaoResumo | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  // O botão some para quem não é admin; a API recusa com 403 quem tentar a rota por fora.
+  const admin = ehAdmin()
 
   // O filtro de plataforma segue o cadastro (aba Plataformas). Se a consulta falhar, ficam as duas
   // que a tela sempre ofereceu.
@@ -114,6 +123,15 @@ export function ListaIntegracoes({ versao = 0 }: Props) {
     )
   }, [integracoes, busca])
 
+  // O aviso de sucesso some sozinho; quem quiser reler a alteração tem o histórico no LOGINT.
+  useEffect(() => {
+    if (!aviso) {
+      return
+    }
+    const temporizador = setTimeout(() => setAviso(null), 8000)
+    return () => clearTimeout(temporizador)
+  }, [aviso])
+
   const temFiltro = Boolean(plataforma || ativo || busca)
   const primeiraCarga = carregando && integracoes.length === 0 && !erro
 
@@ -125,6 +143,14 @@ export function ListaIntegracoes({ versao = 0 }: Props) {
         aoVoltar={() => setClienteAberto(null)}
       />
     )
+  }
+
+  function aoSalvarEdicao(atualizada: IntegracaoEdicao, camposAlterados: string[]) {
+    setEmEdicao(null)
+    setAviso(
+      `Integração ${atualizada.codigoIntegracao} (${atualizada.nomeCliente}) atualizada: ${camposAlterados.join(', ')}.`,
+    )
+    carregar()
   }
 
   function limpar() {
@@ -181,86 +207,114 @@ export function ListaIntegracoes({ versao = 0 }: Props) {
         ) : undefined
       }
     >
-      {erro ? (
-        <div className="p-5">
-          <Alerta tom="erro" titulo="Não foi possível carregar">
-            {erro}
-          </Alerta>
-        </div>
-      ) : primeiraCarga ? (
-        <Carregando />
-      ) : visiveis.length === 0 ? (
-        <EstadoVazio
-          icone={<IconeLupa />}
-          texto={
-            integracoes.length === 0
-              ? 'Nenhuma integração encontrada com esses filtros.'
-              : 'Nenhuma integração corresponde à busca.'
-          }
-          acao={
-            temFiltro && (
-              <button
-                type="button"
-                onClick={limpar}
-                className="text-sm font-medium text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline"
-              >
-                Limpar filtros
-              </button>
-            )
-          }
-        />
-      ) : (
-        <Tabela
-          colunas={[
-            { rotulo: 'Código' },
-            { rotulo: 'Lojista', className: 'w-full' },
-            { rotulo: 'Plataforma' },
-            { rotulo: 'Situação' },
-            { rotulo: 'Cadastrada em' },
-          ]}
-        >
-          {visiveis.map((i) => {
-            const quando = formatarData(i.dataInclusao)
-            return (
-              <Linha key={`${i.codigoIntegracao}-${i.codigoCliente}`}>
-                <Celula primeira className="whitespace-nowrap">
-                  <Codigo>{i.codigoIntegracao}</Codigo>
-                </Celula>
-                <Celula className="whitespace-nowrap">
-                  <button
-                    type="button"
-                    onClick={() => setClienteAberto({ nome: i.nomeCliente, codigo: i.codigoCliente })}
-                    title="Ver pedidos deste lojista"
-                    className="group/lojista inline-flex items-center gap-1 font-medium text-slate-900 transition-colors hover:text-brand-700"
-                  >
-                    {i.nomeCliente}
-                    <span className="h-3.5 w-3.5 -translate-x-1 text-brand-600 opacity-0 transition-all duration-150 group-hover/lojista:translate-x-0 group-hover/lojista:opacity-100">
-                      <IconeSetaDireita />
-                    </span>
-                  </button>
-                  <span className="ml-1.5 text-xs text-slate-400 tabular-nums">#{i.codigoCliente}</span>
-                </Celula>
-                <Celula className="whitespace-nowrap">
-                  <EtiquetaPlataforma nome={i.plataforma} />
-                </Celula>
-                <Celula className="whitespace-nowrap">
-                  <EtiquetaSituacao ativo={i.ativo} />
-                </Celula>
-                <Celula ultima className="whitespace-nowrap tabular-nums">
-                  {quando ? (
-                    <>
-                      <div className="text-slate-700">{quando.data}</div>
-                      <div className="text-xs text-slate-400">{quando.hora}</div>
-                    </>
-                  ) : (
-                    <span className="text-slate-400">—</span>
+      <>
+        {aviso && (
+          <div className="px-5 pt-4">
+            <Alerta tom="sucesso" titulo="Alterações salvas">
+              {aviso}
+            </Alerta>
+          </div>
+        )}
+        {erro ? (
+          <div className="p-5">
+            <Alerta tom="erro" titulo="Não foi possível carregar">
+              {erro}
+            </Alerta>
+          </div>
+        ) : primeiraCarga ? (
+          <Carregando />
+        ) : visiveis.length === 0 ? (
+          <EstadoVazio
+            icone={<IconeLupa />}
+            texto={
+              integracoes.length === 0
+                ? 'Nenhuma integração encontrada com esses filtros.'
+                : 'Nenhuma integração corresponde à busca.'
+            }
+            acao={
+              temFiltro && (
+                <button
+                  type="button"
+                  onClick={limpar}
+                  className="text-sm font-medium text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline"
+                >
+                  Limpar filtros
+                </button>
+              )
+            }
+          />
+        ) : (
+          <Tabela
+            colunas={[
+              { rotulo: 'Código' },
+              { rotulo: 'Lojista', className: 'w-full' },
+              { rotulo: 'Plataforma' },
+              { rotulo: 'Situação' },
+              { rotulo: 'Cadastrada em' },
+              ...(admin ? [{ rotulo: 'Ações' }] : []),
+            ]}
+          >
+            {visiveis.map((i) => {
+              const quando = formatarData(i.dataInclusao)
+              return (
+                <Linha key={`${i.codigoIntegracao}-${i.codigoCliente}`}>
+                  <Celula primeira className="whitespace-nowrap">
+                    <Codigo>{i.codigoIntegracao}</Codigo>
+                  </Celula>
+                  <Celula className="whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => setClienteAberto({ nome: i.nomeCliente, codigo: i.codigoCliente })}
+                      title="Ver pedidos deste lojista"
+                      className="group/lojista inline-flex items-center gap-1 font-medium text-slate-900 transition-colors hover:text-brand-700"
+                    >
+                      {i.nomeCliente}
+                      <span className="h-3.5 w-3.5 -translate-x-1 text-brand-600 opacity-0 transition-all duration-150 group-hover/lojista:translate-x-0 group-hover/lojista:opacity-100">
+                        <IconeSetaDireita />
+                      </span>
+                    </button>
+                    <span className="ml-1.5 text-xs text-slate-400 tabular-nums">#{i.codigoCliente}</span>
+                  </Celula>
+                  <Celula className="whitespace-nowrap">
+                    <EtiquetaPlataforma nome={i.plataforma} />
+                  </Celula>
+                  <Celula className="whitespace-nowrap">
+                    <EtiquetaSituacao ativo={i.ativo} />
+                  </Celula>
+                  <Celula ultima={!admin} className="whitespace-nowrap tabular-nums">
+                    {quando ? (
+                      <>
+                        <div className="text-slate-700">{quando.data}</div>
+                        <div className="text-xs text-slate-400">{quando.hora}</div>
+                      </>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </Celula>
+                  {admin && (
+                    <Celula ultima className="whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setEmEdicao(i)}
+                        title={`Editar a integração ${i.codigoIntegracao}`}
+                        aria-label={`Editar a integração ${i.codigoIntegracao} de ${i.nomeCliente}`}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25 active:scale-95"
+                      >
+                        <span className="h-4 w-4">
+                          <IconeEngrenagem />
+                        </span>
+                      </button>
+                    </Celula>
                   )}
-                </Celula>
-              </Linha>
-            )
-          })}
-        </Tabela>
-      )}
+                </Linha>
+              )
+            })}
+          </Tabela>
+        )}
+        {emEdicao && (
+          <ModalEditarIntegracao integracao={emEdicao} aoFechar={() => setEmEdicao(null)} aoSalvar={aoSalvarEdicao} />
+        )}
+      </>
     </CartaoConsulta>
   )
 }

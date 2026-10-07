@@ -80,3 +80,27 @@ export interface DadosCriacaoPlataforma {
   descricao: string
   sistemaExterno: string
 }
+
+/**
+ * GET e PATCH /integracoes/{codigoIntegracao}/{codigoCliente} (somente ADMIN).
+ * Traz a identidade da integração (só leitura) e os três campos editáveis, com a chave privada.
+ * Não traz apiToken, refreshToken nem webhookToken.
+ */
+export interface IntegracaoEdicao {
+  codigoIntegracao: string
+  codigoCliente: number
+  nomeCliente: string
+  plataforma: string
+  slug: string
+  ativo: boolean
+  urlWebservice: string
+  urlApi: string | null
+  chavePrivada: string
+}
+
+/** Corpo do PATCH: só o que mudou. Campo ausente preserva o valor atual. */
+export interface DadosEdicaoIntegracao {
+  urlWebservice?: string
+  urlApi?: string
+  chavePrivada?: string
+}

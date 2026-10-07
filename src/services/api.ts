@@ -214,3 +214,12 @@ export function apiPost<T>(caminho: string, corpo: unknown): Promise<T> {
     body: JSON.stringify(corpo),
   })
 }
+
+/** Atualização parcial: o corpo leva só o que muda, e o que ficar de fora o servidor preserva. */
+export function apiPatch<T>(caminho: string, corpo: unknown): Promise<T> {
+  return requisitar<T>(caminho, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo),
+  })
+}
