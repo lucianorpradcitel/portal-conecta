@@ -7,6 +7,7 @@ import {
   IconeCasa,
   IconeCheck,
   IconeMais,
+  IconeMenos,
   IconePasta,
   IconeSetaCima,
   IconeSetaDireita,
@@ -22,9 +23,12 @@ interface Props {
   /** IDs que já estão na lista de exportação. */
   jaAdicionados: Set<string>
   desabilitado: boolean
+  /** Um download está em andamento: a lista não pode mudar. */
+  baixando: boolean
   /** Quantos workflows ainda cabem na lista de exportação (o ZIP tem limite). */
   vagas: number
   aoAdicionar: (itens: ItemWorkflow[]) => void
+  aoRemover: (itens: ItemWorkflow[]) => void
 }
 
 type Linha =
@@ -64,8 +68,10 @@ export function ExploradorWorkflows({
   mapa,
   jaAdicionados,
   desabilitado,
+  baixando,
   vagas,
   aoAdicionar,
+  aoRemover,
 }: Props) {
   const { porId } = useMemo(() => montarArvore(itens, pastas, mapa), [itens, pastas, mapa])
   const itemPorId = useMemo(() => new Map(itens.map((i) => [i.id, i])), [itens])
@@ -381,20 +387,30 @@ export function ExploradorWorkflows({
                           {todos.length} workflow{todos.length === 1 ? '' : 's'}
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        disabled={desabilitado || faltam.length === 0}
-                        onClick={() => aoAdicionar(todos)}
-                        title={faltam.length === 0 ? 'A pasta toda já está na lista' : 'Adicionar pasta toda'}
-                        aria-label={
-                          faltam.length === 0
-                            ? `Todos os workflows da pasta ${no.nome} já estão na lista`
-                            : `Adicionar pasta toda: ${no.nome} (${faltam.length} workflows)`
-                        }
-                        className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
-                      >
-                        {faltam.length === 0 ? <IconeCheck /> : <IconeMais />}
-                      </button>
+                      {faltam.length === 0 ? (
+                        // A pasta toda já está na lista: o "+" vira um "−" vermelho que tira a pasta toda dela.
+                        <button
+                          type="button"
+                          disabled={baixando}
+                          onClick={() => aoRemover(todos)}
+                          title="Remover pasta toda da lista"
+                          aria-label={`Remover da lista todos os workflows da pasta ${no.nome}`}
+                          className="h-6 w-6 shrink-0 rounded-md p-1 text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                        >
+                          <IconeMenos />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={desabilitado}
+                          onClick={() => aoAdicionar(todos)}
+                          title="Adicionar pasta toda"
+                          aria-label={`Adicionar pasta toda: ${no.nome} (${faltam.length} workflows)`}
+                          className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
+                        >
+                          <IconeMais />
+                        </button>
+                      )}
                     </li>
                   )
                 }

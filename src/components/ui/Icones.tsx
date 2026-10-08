@@ -101,6 +101,14 @@ export function IconeX() {
   )
 }
 
+export function IconeMenos() {
+  return (
+    <Icone>
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </Icone>
+  )
+}
+
 export function IconeCheck() {
   return (
     <Icone>

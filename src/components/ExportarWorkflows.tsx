@@ -26,7 +26,7 @@ import { Alerta } from './ui/Alerta'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
 import { DivisorVertical, gravarPreferencia, lerPreferencia } from './ui/DivisorVertical'
-import { IconeX } from './ui/Icones'
+import { IconeMenos } from './ui/Icones'
 import { Select } from './ui/Select'
 
 /** Espera o usuário parar de digitar antes de consultar a prévia. */
@@ -82,7 +82,7 @@ function BotaoLinha({
       title={rotulo}
       onClick={aoClicar}
       disabled={desabilitado}
-      className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
+      className="h-6 w-6 shrink-0 rounded-md p-1 text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
     >
       {children}
     </button>
@@ -348,6 +348,12 @@ export function ExportarWorkflows() {
     setEscolhidos((atual) => atual.filter((w) => w.id !== id))
   }
 
+  function removerVarios(itens: ItemWorkflow[]) {
+    const ids = new Set(itens.map((w) => w.id))
+    setBaixado(null)
+    setEscolhidos((atual) => atual.filter((w) => !ids.has(w.id)))
+  }
+
   // O ZIP repete as pastas do n8n a partir da raiz, com os nomes originais (ex.: Mercos/Paulinho Motos/...), de modo
   // que extrair um ou vários ZIPs na mesma pasta remonta a mesma hierarquia. "/" dentro de um nome viraria um nível a mais.
   function pastaNoZip(id: string) {
@@ -606,8 +612,10 @@ export function ExportarWorkflows() {
                     mapa={mapaPastas?.workflows ?? {}}
                     jaAdicionados={idsEscolhidos}
                     desabilitado={cheia || baixando}
+                    baixando={baixando}
                     vagas={vagas}
                     aoAdicionar={adicionar}
+                    aoRemover={removerVarios}
                   />
                 ) : (
                   <ArvoreWorkflows
@@ -681,7 +689,7 @@ export function ExportarWorkflows() {
                         {w.nome}
                       </span>
                       <BotaoLinha rotulo={`Remover ${w.nome}`} aoClicar={() => remover(w.id)} desabilitado={baixando}>
-                        <IconeX />
+                        <IconeMenos />
                       </BotaoLinha>
                     </li>
                   ))}
