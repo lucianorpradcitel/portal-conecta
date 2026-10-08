@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ItemWorkflow, PastaN8n } from '../services/workflows'
 import { RAIZ, itensDoNo, montarArvore, type NoPasta } from './pastas'
+import { DivisorVertical, gravarPreferencia, lerPreferencia } from './ui/DivisorVertical'
 import {
   IconeArquivo,
   IconeCasa,
@@ -21,6 +22,8 @@ interface Props {
   /** IDs que já estão na lista de exportação. */
   jaAdicionados: Set<string>
   desabilitado: boolean
+  /** Quantos workflows ainda cabem na lista de exportação (o ZIP tem limite). */
+  vagas: number
   aoAdicionar: (itens: ItemWorkflow[]) => void
 }
 
@@ -30,6 +33,14 @@ type Linha =
 
 /** Até quantas pastas o painel de navegação já abre inteiro; acima disso começa recolhido. */
 const NAVEGACAO_ABRE_ATE = 60
+
+/** Largura do painel de pastas, em px: a de fábrica (11 rem), o mínimo e o máximo ao arrastar a barra. */
+const NAVEGACAO_PADRAO_PX = 176
+const NAVEGACAO_MIN_PX = 120
+const NAVEGACAO_MAX_PX = 480
+/** Largura mínima que o conteúdo da pasta mantém ao alargar o painel de pastas. */
+const CONTEUDO_MIN_PX = 240
+const CHAVE_LARGURA_NAVEGACAO = 'conecta.wf.largura-pastas'
 
 /** Profundidade máxima dos sub-workflows abertos dentro de uma linha (evita descer em ciclos). */
 const PROFUNDIDADE_SUBS = 4
@@ -46,7 +57,16 @@ const CLASSE_ACAO =
  * está fora de pasta fica solto na raiz. Cada workflow mostra os sub-workflows que chama (setinha), que
  * podem ser adicionados junto ("com subs").
  */
-export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionados, desabilitado, aoAdicionar }: Props) {
+export function ExploradorWorkflows({
+  nomeRaiz,
+  itens,
+  pastas,
+  mapa,
+  jaAdicionados,
+  desabilitado,
+  vagas,
+  aoAdicionar,
+}: Props) {
   const { porId } = useMemo(() => montarArvore(itens, pastas, mapa), [itens, pastas, mapa])
   const itemPorId = useMemo(() => new Map(itens.map((i) => [i.id, i])), [itens])
   const pastaPorId = useMemo(() => new Map(pastas.map((p) => [p.id, p])), [pastas])
@@ -55,6 +75,20 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
   const [selecionado, setSelecionado] = useState<string | null>(null)
   const [subsAbertos, setSubsAbertos] = useState<Set<string>>(new Set())
   const [navAbertas, setNavAbertas] = useState<Set<string>>(new Set())
+
+  // Largura do painel de pastas: o usuário arrasta a barra entre ele e o conteúdo (lembrada neste navegador).
+  const corpoRef = useRef<HTMLDivElement>(null)
+  const [larguraNav, setLarguraNav] = useState(() =>
+    lerPreferencia(CHAVE_LARGURA_NAVEGACAO, NAVEGACAO_PADRAO_PX, NAVEGACAO_MIN_PX, NAVEGACAO_MAX_PX),
+  )
+
+  function ajustarNav(px: number) {
+    const total = corpoRef.current?.getBoundingClientRect().width ?? Infinity
+    const maximo = Math.max(NAVEGACAO_MIN_PX, Math.min(NAVEGACAO_MAX_PX, total - CONTEUDO_MIN_PX))
+    const novo = Math.round(Math.min(Math.max(px, NAVEGACAO_MIN_PX), maximo))
+    setLarguraNav(novo)
+    gravarPreferencia(CHAVE_LARGURA_NAVEGACAO, novo)
+  }
 
   // Se a pasta aberta some do resultado (o filtro mudou), volta para a raiz.
   const idAtual = porId.has(atual) ? atual : RAIZ
@@ -265,15 +299,21 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
           title={idAtual === RAIZ ? 'Adicionar todos os workflows do resultado' : 'Adicionar tudo o que está nesta pasta e nas de dentro'}
           className="shrink-0 rounded-md border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
         >
-          Adicionar tudo aqui{faltamAqui.length > 0 ? ` (${faltamAqui.length})` : ''}
+          Adicionar tudo aqui
+          {faltamAqui.length > 0
+            ? faltamAqui.length > vagas
+              ? ` (${vagas} de ${faltamAqui.length})`
+              : ` (${faltamAqui.length})`
+            : ''}
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1">
+      <div ref={corpoRef} className="flex min-h-0 flex-1">
         {/* Painel de navegação */}
         <aside
           aria-label="Pastas"
-          className="hidden w-44 shrink-0 overflow-y-auto border-r border-slate-100 py-1.5 pr-1 lg:block"
+          style={{ width: larguraNav, maxWidth: `calc(100% - ${CONTEUDO_MIN_PX}px)` }}
+          className="hidden shrink-0 overflow-y-auto py-1.5 pr-1 lg:block"
         >
           <ul role="tree">
             <li role="treeitem" aria-selected={idAtual === RAIZ}>
@@ -294,6 +334,14 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
             </li>
           </ul>
         </aside>
+
+        <DivisorVertical
+          rotulo="Largura do painel de pastas"
+          className="hidden w-2 lg:flex"
+          aoArrastar={(x) => ajustarNav(x - (corpoRef.current?.getBoundingClientRect().left ?? 0) - 4)}
+          aoTeclar={(sentido) => ajustarNav(larguraNav + sentido * 16)}
+          aoRestaurar={() => ajustarNav(NAVEGACAO_PADRAO_PX)}
+        />
 
         {/* Conteúdo da pasta aberta */}
         <div className="flex min-w-0 flex-1 flex-col">

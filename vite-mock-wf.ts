@@ -187,7 +187,7 @@ function previa(lista: Wf[], q: URLSearchParams) {
     total: todos.length,
     comuns: comuns.size,
     workflows: todos
-      .slice(0, 300)
+      .slice(0, 5000)
       .map((w) => ({ id: w.id, nome: w.name, comum: comuns.has(w.id), filhos: filhosDe(w) })),
     avisos: {
       dinamicos: dinamicos.size,

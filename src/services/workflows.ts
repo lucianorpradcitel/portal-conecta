@@ -69,6 +69,8 @@ export interface MapaPastas {
   pastas: PastaN8n[]
   /** ID do workflow -> ID da pasta. */
   workflows: Record<string, string>
+  /** Motivo de o n8n não ter devolvido tudo (pastas parciais ou pacote que falhou). */
+  erro?: string
 }
 
 /** Um workflow da instância. O ID é o que identifica: o n8n aceita nomes repetidos. */
@@ -96,11 +98,11 @@ export interface Previa {
   comuns?: number
   /** Chamadas entre workflows que não deu para seguir ao montar a árvore e os comuns. */
   avisos?: AvisosChamadas
-  /** Workflows que casam com os filtros (até LIMITE_LISTA). */
+  /** Workflows que casam com os filtros (todos, até um teto de segurança no n8n). */
   workflows: ItemWorkflow[]
 }
 
-/** O webhook devolve no máximo isto por consulta e aceita no máximo isto por exportação. */
+/** O webhook aceita no máximo isto por exportação (um ZIP). A lista de resultado mostra a instância toda. */
 export const LIMITE_LISTA = 300
 
 export const SEM_FILTROS: Filtros = { cliente: '', base: '', busca: '', comuns: true }
@@ -154,7 +156,7 @@ export function previa(instancia: string, filtros: Filtros): Promise<Previa> {
  */
 export async function listarPastas(instancia: string): Promise<MapaPastas> {
   const resposta = await apiGet<Partial<MapaPastas>>(consulta('pastas', instancia), BASE_WF)
-  return { pastas: resposta.pastas ?? [], workflows: resposta.workflows ?? {} }
+  return { pastas: resposta.pastas ?? [], workflows: resposta.workflows ?? {}, erro: resposta.erro }
 }
 
 /**

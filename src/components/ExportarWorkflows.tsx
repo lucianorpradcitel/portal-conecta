@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ApiError } from '../services/api'
 import {
   LIMITE_LISTA,
@@ -22,14 +22,20 @@ import { ExploradorWorkflows } from './ExploradorWorkflows'
 import { Alerta } from './ui/Alerta'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
+import { DivisorVertical, gravarPreferencia, lerPreferencia } from './ui/DivisorVertical'
 import { IconeX } from './ui/Icones'
 import { Select } from './ui/Select'
 
-/** Valor do filtro de pasta para os workflows que estão fora de qualquer pasta. */
-const SEM_PASTA = '__sem_pasta__'
-
 /** Espera o usuário parar de digitar antes de consultar a prévia. */
 const ATRASO_PREVIA_MS = 350
+
+/** Parte da largura que o painel do resultado ocupa (a de fábrica é 3/5) e quanto ela pode variar ao arrastar a barra. */
+const FRACAO_PADRAO = 0.6
+const CHAVE_FRACAO = 'conecta.wf.largura-resultado'
+/** Larguras mínimas, em px, que cada painel mantém, e a da própria barra (1 rem). */
+const PAINEL_ESQ_MIN_PX = 360
+const PAINEL_DIR_MIN_PX = 288
+const BARRA_PX = 16
 
 const CLASSE_ACAO_TEXTO =
   'text-[13px] font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline'
@@ -104,7 +110,6 @@ export function ExportarWorkflows() {
   const [mapaPastas, setMapaPastas] = useState<MapaPastas | null>(null)
   const [carregandoPastas, setCarregandoPastas] = useState(false)
   const [erroPastas, setErroPastas] = useState<string | null>(null)
-  const [filtroPasta, setFiltroPasta] = useState('')
   const [visao, setVisao] = useState<'pastas' | 'chamadas'>('pastas')
 
   const [carregandoInstancias, setCarregandoInstancias] = useState(true)
@@ -113,6 +118,8 @@ export function ExportarWorkflows() {
   const [baixando, setBaixando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [baixado, setBaixado] = useState<string | null>(null)
+  /** Parte em andamento quando "Baixar tudo" gera vários ZIPs. */
+  const [progresso, setProgresso] = useState<{ parte: number; de: number } | null>(null)
 
   useEffect(() => {
     let cancelado = false
@@ -182,7 +189,6 @@ export function ExportarWorkflows() {
   useEffect(() => {
     setMapaPastas(null)
     setErroPastas(null)
-    setFiltroPasta('')
     setVisao('pastas')
     if (!instancia) {
       setCarregandoPastas(false)
@@ -195,6 +201,7 @@ export function ExportarWorkflows() {
       .then((mapa) => {
         if (!cancelado) {
           setMapaPastas(mapa)
+          setErroPastas(mapa.erro ?? null)
         }
       })
       .catch((e: unknown) => {
@@ -263,42 +270,17 @@ export function ExportarWorkflows() {
     return nomes
   }
 
-  const opcoesPasta = useMemo(
-    () =>
-      pastas
-        .map((p) => ({ id: p.id, rotulo: caminhoDaPasta(p.id).join(' / ') }))
-        .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR', { sensitivity: 'base', numeric: true })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pastas, pastaPorId],
-  )
-
   /** "multi-tenant / Tray": onde o workflow está no n8n (vazio se está fora de pasta). */
   function caminhoTexto(id: string): string {
     const pasta = mapaPastas?.workflows[id]
     return pasta ? caminhoDaPasta(pasta).join(' / ') : ''
   }
 
-  // O filtro de pasta vale para a pasta escolhida e tudo que está dentro dela.
-  const visiveis = useMemo(() => {
-    const lista = resultado?.workflows ?? []
-    if (!filtroPasta || !mapaPastas) {
-      return lista
-    }
-    if (filtroPasta === SEM_PASTA) {
-      return lista.filter((w) => !mapaPastas.workflows[w.id])
-    }
-    const dentro = new Set<string>([filtroPasta])
-    for (let mudou = true; mudou; ) {
-      mudou = false
-      for (const p of mapaPastas.pastas) {
-        if (p.pai && dentro.has(p.pai) && !dentro.has(p.id)) {
-          dentro.add(p.id)
-          mudou = true
-        }
-      }
-    }
-    return lista.filter((w) => dentro.has(mapaPastas.workflows[w.id]))
-  }, [resultado, filtroPasta, mapaPastas])
+  // O resultado só aparece quando os workflows E as pastas chegaram: mostrar os workflows antes faria a lista
+  // inteira aparecer solta na raiz e depois pular para dentro das pastas.
+  const carregandoTudo = Boolean(instancia) && (carregandoPrevia || carregandoPastas || mapaPastas === null)
+
+  const visiveis = useMemo(() => resultado?.workflows ?? [], [resultado])
 
   const idsEscolhidos = useMemo(() => new Set(escolhidos.map((w) => w.id)), [escolhidos])
   // A lista de exportação segue a ordem de um explorador: por pasta e, dentro dela, por nome.
@@ -314,8 +296,31 @@ export function ExportarWorkflows() {
     [escolhidos, mapaPastas, pastaPorId],
   )
   const aAdicionar = visiveis.filter((w) => !idsEscolhidos.has(w.id))
+  // Largura dos dois painéis: o usuário arrasta a barra entre eles (lembrada neste navegador).
+  const gradeRef = useRef<HTMLDivElement>(null)
+  const [fracaoEsq, setFracaoEsq] = useState(() => lerPreferencia(CHAVE_FRACAO, FRACAO_PADRAO, 0.2, 0.85))
+
+  function larguraGrade() {
+    return gradeRef.current?.getBoundingClientRect().width ?? 0
+  }
+
+  /** Define a largura do painel da esquerda (px), respeitando o mínimo dos dois lados. */
+  function ajustarColunas(esquerdaPx: number) {
+    const largura = larguraGrade()
+    if (!largura) {
+      return
+    }
+    const util = largura - BARRA_PX
+    const maximo = util - PAINEL_DIR_MIN_PX
+    const px = maximo < PAINEL_ESQ_MIN_PX ? util / 2 : Math.min(Math.max(esquerdaPx, PAINEL_ESQ_MIN_PX), maximo)
+    const fracao = px / largura
+    setFracaoEsq(fracao)
+    gravarPreferencia(CHAVE_FRACAO, fracao)
+  }
+
   const cheia = escolhidos.length >= LIMITE_LISTA
-  const total = filtroPasta ? visiveis.length : (resultado?.total ?? 0)
+  const vagas = Math.max(0, LIMITE_LISTA - escolhidos.length)
+  const total = resultado?.total ?? 0
 
   function alterar(campo: 'cliente' | 'base' | 'busca', valor: string) {
     setErro(null)
@@ -347,6 +352,24 @@ export function ExportarWorkflows() {
     setEscolhidos((atual) => atual.filter((w) => w.id !== id))
   }
 
+  // O ZIP repete as pastas do n8n a partir da raiz, com os nomes originais (ex.: Mercos/Paulinho Motos/...), de modo
+  // que extrair um ou vários ZIPs na mesma pasta remonta a mesma hierarquia. "/" dentro de um nome viraria um nível a mais.
+  function pastaNoZip(id: string) {
+    const pasta = mapaPastas?.workflows[id]
+    return pasta ? caminhoDaPasta(pasta).map((n) => n.replace(/[\\/]+/g, '-')).join('/') : null
+  }
+
+  function salvarArquivo(blob: Blob, nome: string) {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = nome
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
   async function baixar() {
     if (!instancia || escolhidos.length === 0) {
       return
@@ -355,25 +378,13 @@ export function ExportarWorkflows() {
     setBaixado(null)
     setBaixando(true)
     try {
-      // O ZIP repete as pastas do n8n (com os nomes originais). "/" dentro de um nome viraria um nível a mais.
-      const pastaDe = (id: string) => {
-        const pasta = mapaPastas?.workflows[id]
-        return pasta ? caminhoDaPasta(pasta).map((n) => n.replace(/[\\/]+/g, '-')).join('/') : null
-      }
       const { blob, nomeArquivo } = await baixarZip(
         instancia,
         escolhidos.map((w) => w.id),
-        temPastas ? pastaDe : undefined,
+        temPastas ? pastaNoZip : undefined,
       )
       const nome = nomeArquivo ?? `workflows_${instancia}.zip`
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = nome
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
+      salvarArquivo(blob, nome)
       setBaixado(nome)
     } catch (e) {
       setErro(mensagemDe(e, 'Não foi possível gerar o ZIP.'))
@@ -382,22 +393,78 @@ export function ExportarWorkflows() {
     }
   }
 
+  /**
+   * Baixa tudo o que o resultado do filtro mostra, em vários ZIPs de até LIMITE_LISTA workflows cada. A ordem é a de
+   * um explorador (por pasta e nome), então cada parte leva as pastas quase inteiras, e as partes juntas, extraídas
+   * na mesma pasta, formam a hierarquia completa.
+   */
+  async function baixarTudo() {
+    if (!instancia || visiveis.length === 0) {
+      return
+    }
+    const ordenados = [...visiveis].sort((a, b) =>
+      `${caminhoTexto(a.id)}/${a.nome}`.localeCompare(`${caminhoTexto(b.id)}/${b.nome}`, 'pt-BR', {
+        sensitivity: 'base',
+        numeric: true,
+      }),
+    )
+    const partes: ItemWorkflow[][] = []
+    for (let i = 0; i < ordenados.length; i += LIMITE_LISTA) {
+      partes.push(ordenados.slice(i, i + LIMITE_LISTA))
+    }
+
+    setErro(null)
+    setBaixado(null)
+    setBaixando(true)
+    let feitas = 0
+    try {
+      let base = ''
+      for (let i = 0; i < partes.length; i++) {
+        setProgresso({ parte: i + 1, de: partes.length })
+        const { blob, nomeArquivo } = await baixarZip(
+          instancia,
+          partes[i].map((w) => w.id),
+          temPastas ? pastaNoZip : undefined,
+        )
+        if (!base) {
+          base = (nomeArquivo ?? `workflows_${instancia}.zip`).replace(/\.zip$/i, '')
+        }
+        salvarArquivo(blob, partes.length > 1 ? `${base}_parte${i + 1}de${partes.length}.zip` : `${base}.zip`)
+        feitas += 1
+        if (i < partes.length - 1) {
+          // Pausa curta: o navegador pode recusar vários downloads disparados no mesmo instante.
+          await new Promise((resolve) => setTimeout(resolve, 800))
+        }
+      }
+      setBaixado(
+        partes.length > 1
+          ? `${partes.length} arquivos (${base}_parte1de${partes.length}.zip …). Extraia todos na mesma pasta para ter a hierarquia completa.`
+          : `${base}.zip`,
+      )
+    } catch (e) {
+      const parcial = feitas > 0 ? ` As partes 1 a ${feitas} (de ${partes.length}) já foram baixadas.` : ''
+      setErro(`${mensagemDe(e, 'Não foi possível gerar o ZIP.')}${parcial}`)
+    } finally {
+      setBaixando(false)
+      setProgresso(null)
+    }
+  }
+
   const ocupado = carregandoOpcoes || baixando
   const rotulos = instancias.find((i) => i.id === instancia)?.rotulos ?? ROTULOS_PADRAO
-  const filtrosAtivos = temFiltro(filtros) || Boolean(filtroPasta)
+  const filtrosAtivos = temFiltro(filtros)
 
   function limparFiltros() {
     setErro(null)
     setBaixado(null)
     setFiltros({ ...SEM_FILTROS, comuns: filtros.comuns })
-    setFiltroPasta('')
   }
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
       <div className="space-y-4 px-5 py-5">
         {/* Faixa de filtros: tudo em uma linha, sem textos soltos (as explicações ficam em "Como funcionam") */}
-        <div className={`grid gap-3 sm:grid-cols-2 ${temPastas ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Select
             id="instancia"
             label="Instância do n8n"
@@ -444,25 +511,6 @@ export function ExportarWorkflows() {
               </option>
             ))}
           </Select>
-
-          {temPastas && (
-            <Select
-              id="filtro-pasta"
-              label="Pasta"
-              title="Pasta do n8n em que o workflow está (inclui as de dentro)"
-              value={filtroPasta}
-              disabled={!instancia || ocupado}
-              onChange={(e) => setFiltroPasta(e.target.value)}
-            >
-              <option value="">Todas as pastas</option>
-              {opcoesPasta.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.rotulo}
-                </option>
-              ))}
-              <option value={SEM_PASTA}>(sem pasta)</option>
-            </Select>
-          )}
 
           <Campo
             id="filtro-busca"
@@ -512,21 +560,25 @@ export function ExportarWorkflows() {
 
         {instancia && erroPastas && (
           <p className="text-[13px] text-amber-700">
-            Pastas indisponíveis nesta instância: {erroPastas} A chave da credencial precisa dos escopos de listar
-            pastas e de exportar workflows. Nome, tag e chamadas continuam funcionando.
+            Pastas indisponíveis ou incompletas nesta instância: {erroPastas} A chave da credencial precisa dos
+            escopos de listar pastas e de exportar workflows. Nome, tag e chamadas continuam funcionando.
           </p>
         )}
 
         {erro && <Alerta tom="erro">{erro}</Alerta>}
 
         {/* Esquerda: o que há na instância. Direita: o que vai no ZIP. */}
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div
+          ref={gradeRef}
+          style={{ '--esq': `${(fracaoEsq * 100).toFixed(2)}%` } as CSSProperties}
+          className="grid gap-4 xl:grid-cols-[minmax(0,var(--esq))_1rem_minmax(0,1fr)] xl:gap-0"
+        >
           <Painel
             titulo={
               !instancia
                 ? 'Resultado do filtro'
-                : carregandoPrevia
-                  ? 'Resultado do filtro: buscando…'
+                : carregandoTudo
+                  ? 'Resultado do filtro: carregando…'
                   : `Resultado do filtro (${total})`
             }
             acao={
@@ -557,18 +609,23 @@ export function ExportarWorkflows() {
                 <button
                   type="button"
                   className={CLASSE_ACAO_TEXTO}
-                  disabled={aAdicionar.length === 0 || cheia || baixando}
+                  disabled={carregandoTudo || aAdicionar.length === 0 || cheia || baixando}
                   onClick={() => adicionar(aAdicionar)}
                 >
-                  Adicionar todos{aAdicionar.length > 0 ? ` (${aAdicionar.length})` : ''}
+                  Adicionar todos
+                  {!carregandoTudo && aAdicionar.length > 0
+                    ? aAdicionar.length > vagas
+                      ? ` (${vagas} de ${aAdicionar.length})`
+                      : ` (${aAdicionar.length})`
+                    : ''}
                 </button>
               </div>
             }
           >
             {!instancia ? (
               <Vazio>Escolha a instância.</Vazio>
-            ) : carregandoPrevia && !resultado ? (
-              <Vazio>Buscando workflows…</Vazio>
+            ) : carregandoTudo ? (
+              <Vazio>Carregando workflows e pastas…</Vazio>
             ) : resultado && visiveis.length === 0 ? (
               <Vazio>Nenhum workflow neste filtro.</Vazio>
             ) : (
@@ -581,6 +638,7 @@ export function ExportarWorkflows() {
                     mapa={mapaPastas?.workflows ?? {}}
                     jaAdicionados={idsEscolhidos}
                     desabilitado={cheia || baixando}
+                    vagas={vagas}
                     aoAdicionar={adicionar}
                   />
                 ) : (
@@ -604,7 +662,7 @@ export function ExportarWorkflows() {
                     não puderam ser seguidas, então podem faltar sub-workflows. Passe o mouse para ver exemplos.
                   </p>
                 )}
-                {resultado && !filtroPasta && total > resultado.workflows.length && (
+                {resultado && total > resultado.workflows.length && (
                   <p className="shrink-0 border-t border-slate-100 px-4 py-1.5 text-sm text-slate-400">
                     …e mais {total - resultado.workflows.length}. Refine o filtro para ver o restante.
                   </p>
@@ -612,6 +670,16 @@ export function ExportarWorkflows() {
               </>
             )}
           </Painel>
+
+          <DivisorVertical
+            rotulo="Largura dos painéis do resultado e da exportação"
+            className="hidden xl:flex"
+            aoArrastar={(x) =>
+              ajustarColunas(x - (gradeRef.current?.getBoundingClientRect().left ?? 0) - BARRA_PX / 2)
+            }
+            aoTeclar={(sentido) => ajustarColunas(fracaoEsq * larguraGrade() + sentido * 24)}
+            aoRestaurar={() => ajustarColunas(FRACAO_PADRAO * larguraGrade())}
+          />
 
           <Painel
             titulo={`Para exportar (${escolhidos.length})`}
@@ -652,7 +720,8 @@ export function ExportarWorkflows() {
             <div className="shrink-0 space-y-2 border-t border-slate-100 bg-slate-50/50 p-3">
               {cheia && (
                 <p className="text-[13px] text-amber-700">
-                  A lista chegou ao limite de {LIMITE_LISTA} workflows por ZIP. Baixe este e monte outro para o restante.
+                  A lista chegou ao limite de {LIMITE_LISTA} workflows por ZIP. Baixe este e monte outro para o restante,
+                  ou use “Baixar tudo do resultado”, que divide em vários ZIPs.
                 </p>
               )}
               {baixado && (
@@ -661,7 +730,25 @@ export function ExportarWorkflows() {
                 </Alerta>
               )}
               <Botao type="button" className="w-full" onClick={baixar} disabled={escolhidos.length === 0 || baixando}>
-                {baixando ? 'Gerando ZIP…' : `Baixar ZIP${escolhidos.length > 0 ? ` (${escolhidos.length})` : ''}`}
+                {baixando
+                  ? progresso
+                    ? `Gerando parte ${progresso.parte} de ${progresso.de}…`
+                    : 'Gerando ZIP…'
+                  : `Baixar ZIP${escolhidos.length > 0 ? ` (${escolhidos.length})` : ''}`}
+              </Botao>
+              <Botao
+                type="button"
+                variante="secundario"
+                className="w-full"
+                onClick={baixarTudo}
+                disabled={carregandoTudo || visiveis.length === 0 || baixando}
+                title="Baixa todos os workflows do resultado do filtro, sem precisar adicioná-los à lista, em ZIPs de até 300 cada"
+              >
+                {visiveis.length === 0 || carregandoTudo
+                  ? 'Baixar tudo do resultado'
+                  : `Baixar tudo do resultado (${visiveis.length}${
+                      visiveis.length > LIMITE_LISTA ? `, ${Math.ceil(visiveis.length / LIMITE_LISTA)} ZIPs` : ''
+                    })`}
               </Botao>
               <p className="text-[12px] leading-snug text-slate-500">
                 <strong className="font-semibold text-amber-700">Cuidado:</strong> os JSONs podem conter senhas e tokens em
