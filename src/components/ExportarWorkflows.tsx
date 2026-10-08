@@ -7,20 +7,26 @@ import {
   baixarZip,
   listarInstancias,
   listarOpcoes,
+  listarPastas,
   previa,
   temFiltro,
   type Filtros,
   type InstanciaN8n,
   type ItemWorkflow,
+  type MapaPastas,
   type OpcaoFiltro,
   type Previa,
 } from '../services/workflows'
+import { ArvorePastas } from './ArvorePastas'
 import { ArvoreWorkflows } from './ArvoreWorkflows'
 import { Alerta } from './ui/Alerta'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
 import { IconeX } from './ui/Icones'
 import { Select } from './ui/Select'
+
+/** Valor do filtro de pasta para os workflows que estão fora de qualquer pasta. */
+const SEM_PASTA = '__sem_pasta__'
 
 /** Espera o usuário parar de digitar antes de consultar a prévia. */
 const ATRASO_PREVIA_MS = 350
@@ -92,6 +98,13 @@ export function ExportarWorkflows() {
   const [filtros, setFiltros] = useState<Filtros>(SEM_FILTROS)
   const [resultado, setResultado] = useState<Previa | null>(null)
   const [escolhidos, setEscolhidos] = useState<ItemWorkflow[]>([])
+  // Pastas do n8n: vêm de um pacote exportado, demoram alguns segundos e são um extra (sem elas a tela
+  // segue funcionando por nome, tag e chamadas).
+  const [mapaPastas, setMapaPastas] = useState<MapaPastas | null>(null)
+  const [carregandoPastas, setCarregandoPastas] = useState(false)
+  const [erroPastas, setErroPastas] = useState<string | null>(null)
+  const [filtroPasta, setFiltroPasta] = useState('')
+  const [visao, setVisao] = useState<'pastas' | 'chamadas'>('pastas')
 
   const [carregandoInstancias, setCarregandoInstancias] = useState(true)
   const [carregandoOpcoes, setCarregandoOpcoes] = useState(false)
@@ -165,6 +178,40 @@ export function ExportarWorkflows() {
     }
   }, [instancia])
 
+  useEffect(() => {
+    setMapaPastas(null)
+    setErroPastas(null)
+    setFiltroPasta('')
+    setVisao('pastas')
+    if (!instancia) {
+      setCarregandoPastas(false)
+      return
+    }
+
+    let cancelado = false
+    setCarregandoPastas(true)
+    listarPastas(instancia)
+      .then((mapa) => {
+        if (!cancelado) {
+          setMapaPastas(mapa)
+        }
+      })
+      .catch((e: unknown) => {
+        if (!cancelado) {
+          setMapaPastas({ pastas: [], workflows: {} })
+          setErroPastas(mensagemDe(e, 'Não foi possível carregar as pastas desta instância.'))
+        }
+      })
+      .finally(() => {
+        if (!cancelado) {
+          setCarregandoPastas(false)
+        }
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [instancia])
+
   // O resultado acompanha os filtros.
   useEffect(() => {
     setResultado(null)
@@ -200,10 +247,56 @@ export function ExportarWorkflows() {
     }
   }, [instancia, filtros])
 
+  const pastas = mapaPastas?.pastas ?? []
+  const temPastas = pastas.length > 0
+  const pastaPorId = useMemo(() => new Map(pastas.map((p) => [p.id, p])), [pastas])
+
+  /** Nomes das pastas da raiz até a pasta (a pasta dentro de outra, dentro de outra...). */
+  function caminhoDaPasta(id: string): string[] {
+    const nomes: string[] = []
+    let atual = pastaPorId.get(id)
+    for (let i = 0; atual && i < 30; i++) {
+      nomes.unshift(atual.nome)
+      atual = atual.pai ? pastaPorId.get(atual.pai) : undefined
+    }
+    return nomes
+  }
+
+  const opcoesPasta = useMemo(
+    () =>
+      pastas
+        .map((p) => ({ id: p.id, rotulo: caminhoDaPasta(p.id).join(' / ') }))
+        .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR', { sensitivity: 'base', numeric: true })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pastas, pastaPorId],
+  )
+
+  // O filtro de pasta vale para a pasta escolhida e tudo que está dentro dela.
+  const visiveis = useMemo(() => {
+    const lista = resultado?.workflows ?? []
+    if (!filtroPasta || !mapaPastas) {
+      return lista
+    }
+    if (filtroPasta === SEM_PASTA) {
+      return lista.filter((w) => !mapaPastas.workflows[w.id])
+    }
+    const dentro = new Set<string>([filtroPasta])
+    for (let mudou = true; mudou; ) {
+      mudou = false
+      for (const p of mapaPastas.pastas) {
+        if (p.pai && dentro.has(p.pai) && !dentro.has(p.id)) {
+          dentro.add(p.id)
+          mudou = true
+        }
+      }
+    }
+    return lista.filter((w) => dentro.has(mapaPastas.workflows[w.id]))
+  }, [resultado, filtroPasta, mapaPastas])
+
   const idsEscolhidos = useMemo(() => new Set(escolhidos.map((w) => w.id)), [escolhidos])
-  const aAdicionar = resultado?.workflows.filter((w) => !idsEscolhidos.has(w.id)) ?? []
+  const aAdicionar = visiveis.filter((w) => !idsEscolhidos.has(w.id))
   const cheia = escolhidos.length >= LIMITE_LISTA
-  const total = resultado?.total ?? 0
+  const total = filtroPasta ? visiveis.length : (resultado?.total ?? 0)
 
   function alterar(campo: 'cliente' | 'base' | 'busca', valor: string) {
     setErro(null)
@@ -243,9 +336,15 @@ export function ExportarWorkflows() {
     setBaixado(null)
     setBaixando(true)
     try {
+      // O ZIP repete as pastas do n8n (com os nomes originais). "/" dentro de um nome viraria um nível a mais.
+      const pastaDe = (id: string) => {
+        const pasta = mapaPastas?.workflows[id]
+        return pasta ? caminhoDaPasta(pasta).map((n) => n.replace(/[\\/]+/g, '-')).join('/') : null
+      }
       const { blob, nomeArquivo } = await baixarZip(
         instancia,
         escolhidos.map((w) => w.id),
+        temPastas ? pastaDe : undefined,
       )
       const nome = nomeArquivo ?? `workflows_${instancia}.zip`
       const url = URL.createObjectURL(blob)
@@ -285,7 +384,7 @@ export function ExportarWorkflows() {
           ))}
         </Select>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className={`grid gap-4 ${temPastas ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
           <Select
             id="filtro-cliente"
             label={rotulos.primeiro}
@@ -318,6 +417,25 @@ export function ExportarWorkflows() {
             ))}
           </Select>
 
+          {temPastas && (
+            <Select
+              id="filtro-pasta"
+              label="Pasta"
+              ajuda="Pasta do n8n em que o workflow está (inclui as de dentro)."
+              value={filtroPasta}
+              disabled={!instancia || ocupado}
+              onChange={(e) => setFiltroPasta(e.target.value)}
+            >
+              <option value="">Todas as pastas</option>
+              {opcoesPasta.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.rotulo}
+                </option>
+              ))}
+              <option value={SEM_PASTA}>(sem pasta)</option>
+            </Select>
+          )}
+
           <Campo
             id="filtro-busca"
             label="O nome contém"
@@ -328,6 +446,16 @@ export function ExportarWorkflows() {
             onChange={(e) => alterar('busca', e.target.value)}
           />
         </div>
+
+        {instancia && carregandoPastas && (
+          <p className="text-[13px] text-slate-400">Carregando as pastas do n8n… a lista já pode ser usada.</p>
+        )}
+        {instancia && erroPastas && (
+          <p className="text-[13px] text-amber-700">
+            Pastas indisponíveis nesta instância: {erroPastas} A chave da credencial precisa dos escopos de listar
+            pastas e de exportar workflows. Nome, tag e chamadas continuam funcionando.
+          </p>
+        )}
 
         <div className="space-y-3">
           <p className="text-sm text-slate-500">
@@ -381,16 +509,50 @@ export function ExportarWorkflows() {
               <Vazio>Escolha a instância.</Vazio>
             ) : carregandoPrevia && !resultado ? (
               <Vazio>Buscando workflows…</Vazio>
-            ) : resultado && resultado.workflows.length === 0 ? (
+            ) : resultado && visiveis.length === 0 ? (
               <Vazio>Nenhum workflow neste filtro.</Vazio>
             ) : (
               <>
-                <ArvoreWorkflows
-                  itens={resultado?.workflows ?? []}
-                  jaAdicionados={idsEscolhidos}
-                  desabilitado={cheia || baixando}
-                  aoAdicionar={adicionar}
-                />
+                {temPastas && (
+                  <div className="flex items-center gap-1 border-b border-slate-100 px-4 py-1.5" role="tablist" aria-label="Como mostrar o resultado">
+                    {(
+                      [
+                        { id: 'pastas', rotulo: 'Por pasta' },
+                        { id: 'chamadas', rotulo: 'Por chamadas' },
+                      ] as const
+                    ).map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={visao === v.id}
+                        onClick={() => setVisao(v.id)}
+                        className={`rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors ${
+                          visao === v.id ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        {v.rotulo}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {temPastas && visao === 'pastas' ? (
+                  <ArvorePastas
+                    itens={visiveis}
+                    pastas={pastas}
+                    mapa={mapaPastas?.workflows ?? {}}
+                    jaAdicionados={idsEscolhidos}
+                    desabilitado={cheia || baixando}
+                    aoAdicionar={adicionar}
+                  />
+                ) : (
+                  <ArvoreWorkflows
+                    itens={visiveis}
+                    jaAdicionados={idsEscolhidos}
+                    desabilitado={cheia || baixando}
+                    aoAdicionar={adicionar}
+                  />
+                )}
                 {resultado?.avisos && resultado.avisos.dinamicos + resultado.avisos.naoResolvidos > 0 && (
                   <p
                     className="border-t border-slate-100 px-4 py-1.5 text-[13px] text-amber-700"
@@ -404,7 +566,7 @@ export function ExportarWorkflows() {
                     não puderam ser seguidas, então podem faltar sub-workflows. Passe o mouse para ver exemplos.
                   </p>
                 )}
-                {resultado && total > resultado.workflows.length && (
+                {resultado && !filtroPasta && total > resultado.workflows.length && (
                   <p className="border-t border-slate-100 px-4 py-1.5 text-sm text-slate-400">
                     …e mais {total - resultado.workflows.length}. Refine o filtro para ver o restante.
                   </p>

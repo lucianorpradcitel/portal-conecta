@@ -18,6 +18,14 @@ interface Wf {
   name: string
   tags?: string[]
   chama?: string[]
+  /** ID da pasta do n8n em que o workflow está (ausente = fora de pasta). */
+  pasta?: string
+}
+
+interface Pasta {
+  id: string
+  nome: string
+  pai: string | null
 }
 
 const CATEGORIA_PLATAFORMA = {
@@ -48,30 +56,30 @@ const INSTANCIAS = [
 
 const WORKFLOWS: Record<string, Wf[]> = {
   automaker_prod: [
-    { id: 'p01', name: 'MASTER_Tray_Pedido_Captura', tags: ['master', 'tray', 'captura'], chama: ['SUB_Contexto', 'p13'] },
-    { id: 'p02', name: 'MASTER_Tray_Pedido_Processa', tags: ['master', 'tray'], chama: ['SUB_Contexto'] },
-    { id: 'p03', name: 'MASTER_Tray_Produto_Item', tags: ['master', 'tray'] },
-    { id: 'p04', name: 'MASTER_Mercos_Pedido_Captura', tags: ['master', 'mercos'], chama: ['SUB_Contexto'] },
-    { id: 'p05', name: 'MASTER_Mercos_Clientes_Captura', tags: ['master', 'mercos'] },
-    { id: 'p06', name: 'MASTER_Shopify_Pedido_Captura', tags: ['master', 'shopify'] },
-    { id: 'p07', name: 'MASTER_Cilia_Orcamento', tags: ['master', 'cilia'] },
-    { id: 'p08', name: 'TOOLS_Admin_Limpar_Execucoes', tags: ['tools'] },
-    { id: 'p09', name: 'TOOLS_Admin_Reprocessar_Pedido', tags: ['tools'] },
-    { id: 'p10', name: 'LEGADO_Tray_Estoque_Antigo', tags: ['legado', 'tray'], chama: ['SUB_Que_Foi_Apagado'] },
-    { id: 'p11', name: 'Portal_Acesso' },
-    { id: 'p12', name: 'Portal_WF_Exportar' },
-    { id: 'p13', name: 'SUB_Retry', chama: ['SUB_Log'] },
-    { id: 'p14', name: 'SUB_Contexto', chama: ['SUB_Log'] },
-    { id: 'p15', name: 'SUB_Log' },
+    { id: 'p01', pasta: 'T1', name: 'MASTER_Tray_Pedido_Captura', tags: ['master', 'tray', 'captura'], chama: ['SUB_Contexto', 'p13'] },
+    { id: 'p02', pasta: 'T1', name: 'MASTER_Tray_Pedido_Processa', tags: ['master', 'tray'], chama: ['SUB_Contexto'] },
+    { id: 'p03', pasta: 'T1', name: 'MASTER_Tray_Produto_Item', tags: ['master', 'tray'] },
+    { id: 'p04', pasta: 'M1', name: 'MASTER_Mercos_Pedido_Captura', tags: ['master', 'mercos'], chama: ['SUB_Contexto'] },
+    { id: 'p05', pasta: 'M1', name: 'MASTER_Mercos_Clientes_Captura', tags: ['master', 'mercos'] },
+    { id: 'p06', pasta: 'S1', name: 'MASTER_Shopify_Pedido_Captura', tags: ['master', 'shopify'] },
+    { id: 'p07', pasta: 'C1', name: 'MASTER_Cilia_Orcamento', tags: ['master', 'cilia'] },
+    { id: 'p08', pasta: 'R2', name: 'TOOLS_Admin_Limpar_Execucoes', tags: ['tools'] },
+    { id: 'p09', pasta: 'R2', name: 'TOOLS_Admin_Reprocessar_Pedido', tags: ['tools'] },
+    { id: 'p10', pasta: 'R3', name: 'LEGADO_Tray_Estoque_Antigo', tags: ['legado', 'tray'], chama: ['SUB_Que_Foi_Apagado'] },
+    { id: 'p11', pasta: 'R4', name: 'Portal_Acesso' },
+    { id: 'p12', pasta: 'R4', name: 'Portal_WF_Exportar' },
+    { id: 'p13', pasta: 'R1', name: 'SUB_Retry', chama: ['SUB_Log'] },
+    { id: 'p14', pasta: 'R1', name: 'SUB_Contexto', chama: ['SUB_Log'] },
+    { id: 'p15', pasta: 'R1', name: 'SUB_Log' },
   ],
   automaker_1: [
-    { id: 'a01', name: 'Servtec_Tray_NFe', tags: ['Tray NFe 4.0'] },
-    { id: 'a02', name: 'Cofam_Tray_Estoque', tags: ['Tray Estoque 3.0', 'Tray Estoque 4.0'] },
-    { id: 'a03', name: 'Cofam_Tray_Credenciais', tags: ['Tray Credenciais 3.0'] },
-    { id: 'a04', name: 'AutopecAutoPecas_Tray_Pedido_Captura', tags: ['Tray Captura 4.0'] },
-    { id: 'a05', name: 'Ferraminas_Tray_Estoque', tags: ['Tray Preco 3.0', 'Tray Estoque 4.0'] },
-    { id: 'a06', name: 'LAB_Mercos_Pedido_Captura', tags: ['mercos'] },
-    { id: 'a07', name: 'LAB_Mercos_Titulos', tags: ['mercos'] },
+    { id: 'a01', pasta: 'A4', name: 'Servtec_Tray_NFe', tags: ['Tray NFe 4.0'] },
+    { id: 'a02', pasta: 'A2', name: 'Cofam_Tray_Estoque', tags: ['Tray Estoque 3.0', 'Tray Estoque 4.0'] },
+    { id: 'a03', pasta: 'A2', name: 'Cofam_Tray_Credenciais', tags: ['Tray Credenciais 3.0'] },
+    { id: 'a04', pasta: 'A4', name: 'AutopecAutoPecas_Tray_Pedido_Captura', tags: ['Tray Captura 4.0'] },
+    { id: 'a05', pasta: 'A4', name: 'Ferraminas_Tray_Estoque', tags: ['Tray Preco 3.0', 'Tray Estoque 4.0'] },
+    { id: 'a06', pasta: 'A3', name: 'LAB_Mercos_Pedido_Captura', tags: ['mercos'] },
+    { id: 'a07', pasta: 'A3', name: 'LAB_Mercos_Titulos', tags: ['mercos'] },
     { id: 'a08', name: 'Paraiso_Shopify_PedidoProcessa' },
   ],
   automakerdev_cr: [
@@ -80,6 +88,26 @@ const WORKFLOWS: Record<string, Wf[]> = {
     { id: 'd03', name: 'LAB_Mercos_Credenciais' },
     { id: 'd04', name: 'Paraiso_Shopify_PedidoProcessa' },
   ],
+}
+
+const PASTAS: Record<string, Pasta[]> = {
+  automaker_prod: [
+    { id: 'R1', nome: 'multi-tenant', pai: null },
+    { id: 'T1', nome: 'Tray', pai: 'R1' },
+    { id: 'M1', nome: 'Mercos', pai: 'R1' },
+    { id: 'S1', nome: 'Shopify', pai: 'R1' },
+    { id: 'C1', nome: 'Cilia', pai: 'R1' },
+    { id: 'R2', nome: 'tools', pai: null },
+    { id: 'R3', nome: 'legado', pai: null },
+    { id: 'R4', nome: '🌌 Portal Integrações', pai: null },
+  ],
+  automaker_1: [
+    { id: 'A1', nome: 'Migrado MT', pai: null },
+    { id: 'A2', nome: '(MIGRADO MT) TMS Cores', pai: 'A1' },
+    { id: 'A3', nome: 'Mercos', pai: 'A1' },
+    { id: 'A4', nome: 'Tray', pai: null },
+  ],
+  automakerdev_cr: [],
 }
 
 const minus = (s: unknown) => String(s ?? '').trim().toLowerCase()
@@ -198,6 +226,16 @@ function tratar(req: IncomingMessage, res: ServerResponse): boolean {
   const lista = WORKFLOWS[minus(q.get('instancia'))]
   if (!lista) {
     json(res, 404, { error: 'Instância não encontrada' })
+    return true
+  }
+  if (acao === 'pastas') {
+    const instancia = minus(q.get('instancia'))
+    const mapa: Record<string, string> = {}
+    for (const w of lista) {
+      if (w.pasta) mapa[w.id] = w.pasta
+    }
+    // O n8n de verdade leva alguns segundos (exporta um pacote): o atraso deixa ver o estado "carregando".
+    setTimeout(() => json(res, 200, { instancia, pastas: PASTAS[instancia] ?? [], workflows: mapa }), 1200)
     return true
   }
   if (acao === 'clientes') {

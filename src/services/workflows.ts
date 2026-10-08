@@ -57,6 +57,20 @@ export interface Filtros {
   comuns: boolean
 }
 
+/** Pasta do n8n. `pai` é nulo nas pastas de topo. */
+export interface PastaN8n {
+  id: string
+  nome: string
+  pai: string | null
+}
+
+/** Árvore de pastas da instância e em qual pasta cada workflow está (quem não aparece está fora de pasta). */
+export interface MapaPastas {
+  pastas: PastaN8n[]
+  /** ID do workflow -> ID da pasta. */
+  workflows: Record<string, string>
+}
+
 /** Um workflow da instância. O ID é o que identifica: o n8n aceita nomes repetidos. */
 export interface ItemWorkflow {
   id: string
@@ -134,8 +148,42 @@ export function previa(instancia: string, filtros: Filtros): Promise<Previa> {
   return apiGet<Previa>(consulta('previa', instancia, filtros), BASE_WF)
 }
 
-/** Baixa o ZIP com um .json por workflow escolhido. A seleção vai por ID, não por filtro. */
-export function baixarZip(instancia: string, ids: string[]) {
+/**
+ * Pastas da instância e a pasta de cada workflow. O n8n monta isso a partir de um pacote exportado, o que
+ * leva alguns segundos: a tela pede uma vez ao escolher a instância e segue usável enquanto espera.
+ */
+export async function listarPastas(instancia: string): Promise<MapaPastas> {
+  const resposta = await apiGet<Partial<MapaPastas>>(consulta('pastas', instancia), BASE_WF)
+  return { pastas: resposta.pastas ?? [], workflows: resposta.workflows ?? {} }
+}
+
+/**
+ * Baixa o ZIP com um .json por workflow escolhido. A seleção vai por ID, não por filtro.
+ *
+ * `pastaDe` devolve o caminho de pastas de um workflow (ex.: "multi-tenant/Tray"), e o ZIP repete a mesma
+ * estrutura. Os caminhos repetidos vão uma vez só, e cada ID aponta para o seu pelo índice, para a URL
+ * não crescer com o tamanho da lista.
+ */
+export function baixarZip(instancia: string, ids: string[], pastaDe?: (id: string) => string | null) {
   const params = new URLSearchParams({ acao: 'exportar', instancia, ids: ids.join(',') })
+  if (pastaDe) {
+    const caminhos: string[] = []
+    const indices = ids.map((id) => {
+      const caminho = pastaDe(id)
+      if (!caminho) {
+        return ''
+      }
+      let k = caminhos.indexOf(caminho)
+      if (k < 0) {
+        k = caminhos.length
+        caminhos.push(caminho)
+      }
+      return String(k)
+    })
+    if (caminhos.length > 0) {
+      params.set('dirs', JSON.stringify(caminhos))
+      params.set('idx', indices.join(','))
+    }
+  }
   return apiBaixar(`?${params.toString()}`, BASE_WF)
 }
