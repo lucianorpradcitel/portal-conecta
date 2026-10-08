@@ -17,8 +17,8 @@ import {
   type OpcaoFiltro,
   type Previa,
 } from '../services/workflows'
-import { ArvorePastas } from './ArvorePastas'
 import { ArvoreWorkflows } from './ArvoreWorkflows'
+import { ExploradorWorkflows } from './ExploradorWorkflows'
 import { Alerta } from './ui/Alerta'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
@@ -271,6 +271,12 @@ export function ExportarWorkflows() {
     [pastas, pastaPorId],
   )
 
+  /** "multi-tenant / Tray": onde o workflow está no n8n (vazio se está fora de pasta). */
+  function caminhoTexto(id: string): string {
+    const pasta = mapaPastas?.workflows[id]
+    return pasta ? caminhoDaPasta(pasta).join(' / ') : ''
+  }
+
   // O filtro de pasta vale para a pasta escolhida e tudo que está dentro dela.
   const visiveis = useMemo(() => {
     const lista = resultado?.workflows ?? []
@@ -294,6 +300,18 @@ export function ExportarWorkflows() {
   }, [resultado, filtroPasta, mapaPastas])
 
   const idsEscolhidos = useMemo(() => new Set(escolhidos.map((w) => w.id)), [escolhidos])
+  // A lista de exportação segue a ordem de um explorador: por pasta e, dentro dela, por nome.
+  const escolhidosOrdenados = useMemo(
+    () =>
+      [...escolhidos].sort((a, b) =>
+        `${caminhoTexto(a.id)}/${a.nome}`.localeCompare(`${caminhoTexto(b.id)}/${b.nome}`, 'pt-BR', {
+          sensitivity: 'base',
+          numeric: true,
+        }),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [escolhidos, mapaPastas, pastaPorId],
+  )
   const aAdicionar = visiveis.filter((w) => !idsEscolhidos.has(w.id))
   const cheia = escolhidos.length >= LIMITE_LISTA
   const total = filtroPasta ? visiveis.length : (resultado?.total ?? 0)
@@ -485,7 +503,7 @@ export function ExportarWorkflows() {
           </label>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4">
           <Painel
             titulo={
               !instancia
@@ -517,7 +535,7 @@ export function ExportarWorkflows() {
                   <div className="flex items-center gap-1 border-b border-slate-100 px-4 py-1.5" role="tablist" aria-label="Como mostrar o resultado">
                     {(
                       [
-                        { id: 'pastas', rotulo: 'Por pasta' },
+                        { id: 'pastas', rotulo: 'Explorador' },
                         { id: 'chamadas', rotulo: 'Por chamadas' },
                       ] as const
                     ).map((v) => (
@@ -537,7 +555,8 @@ export function ExportarWorkflows() {
                   </div>
                 )}
                 {temPastas && visao === 'pastas' ? (
-                  <ArvorePastas
+                  <ExploradorWorkflows
+                    nomeRaiz={instancias.find((i) => i.id === instancia)?.nome ?? ''}
                     itens={visiveis}
                     pastas={pastas}
                     mapa={mapaPastas?.workflows ?? {}}
@@ -584,17 +603,21 @@ export function ExportarWorkflows() {
                 disabled={escolhidos.length === 0 || baixando}
                 onClick={() => setEscolhidos([])}
               >
-                Limpar lista
+                Remover todos
               </button>
             }
           >
             {escolhidos.length === 0 ? (
               <Vazio>Adicione workflows do resultado do filtro. A lista se mantém ao trocar de filtro.</Vazio>
             ) : (
-              <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto text-sm text-slate-600">
-                {escolhidos.map((w) => (
+              <ul className="max-h-[26rem] divide-y divide-slate-100 overflow-y-auto text-sm text-slate-600">
+                {escolhidosOrdenados.map((w) => (
                   <li key={w.id} className="flex items-center justify-between gap-2 px-4 py-1.5">
-                    <span className="min-w-0 truncate" title={w.nome}>
+                    <span
+                      className="min-w-0 flex-1 truncate"
+                      title={caminhoTexto(w.id) ? `${caminhoTexto(w.id)} / ${w.nome}` : w.nome}
+                    >
+                      {caminhoTexto(w.id) && <span className="text-[12px] text-slate-400">{caminhoTexto(w.id)} / </span>}
                       {w.nome}
                     </span>
                     <BotaoLinha rotulo={`Remover ${w.nome}`} aoClicar={() => remover(w.id)} desabilitado={baixando}>

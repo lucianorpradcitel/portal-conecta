@@ -56,8 +56,8 @@ const INSTANCIAS = [
 
 const WORKFLOWS: Record<string, Wf[]> = {
   automaker_prod: [
-    { id: 'p01', pasta: 'T1', name: 'MASTER_Tray_Pedido_Captura', tags: ['master', 'tray', 'captura'], chama: ['SUB_Contexto', 'p13'] },
-    { id: 'p02', pasta: 'T1', name: 'MASTER_Tray_Pedido_Processa', tags: ['master', 'tray'], chama: ['SUB_Contexto'] },
+    { id: 'p01', pasta: 'T2', name: 'MASTER_Tray_Pedido_Captura', tags: ['master', 'tray', 'captura'], chama: ['SUB_Contexto', 'p13'] },
+    { id: 'p02', pasta: 'T2', name: 'MASTER_Tray_Pedido_Processa', tags: ['master', 'tray'], chama: ['SUB_Contexto'] },
     { id: 'p03', pasta: 'T1', name: 'MASTER_Tray_Produto_Item', tags: ['master', 'tray'] },
     { id: 'p04', pasta: 'M1', name: 'MASTER_Mercos_Pedido_Captura', tags: ['master', 'mercos'], chama: ['SUB_Contexto'] },
     { id: 'p05', pasta: 'M1', name: 'MASTER_Mercos_Clientes_Captura', tags: ['master', 'mercos'] },
@@ -94,6 +94,7 @@ const PASTAS: Record<string, Pasta[]> = {
   automaker_prod: [
     { id: 'R1', nome: 'multi-tenant', pai: null },
     { id: 'T1', nome: 'Tray', pai: 'R1' },
+    { id: 'T2', nome: 'Pedidos', pai: 'T1' },
     { id: 'M1', nome: 'Mercos', pai: 'R1' },
     { id: 'S1', nome: 'Shopify', pai: 'R1' },
     { id: 'C1', nome: 'Cilia', pai: 'R1' },

@@ -70,7 +70,8 @@ const LARGURA: Record<Aba, string> = {
   consulta: 'max-w-none',
   integracao: 'max-w-5xl',
   plataformas: 'max-w-6xl',
-  workflows: 'max-w-5xl',
+  // Largura total: o explorador de workflows tem painel de pastas, lista e a lista de exportação lado a lado.
+  workflows: 'max-w-none',
 }
 
 export default function App() {
