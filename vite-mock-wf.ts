@@ -131,11 +131,22 @@ function previa(lista: Wf[], q: URLSearchParams) {
     }
   }
 
+  // Quem cada workflow chama (por id ou por nome), para a tela montar a árvore workflow > sub-workflow.
+  const filhosDe = (w: Wf) => [
+    ...new Set(
+      (w.chama ?? []).flatMap((ref) =>
+        lista.filter((x) => x.id === ref || minus(x.name) === minus(ref)).map((x) => x.id),
+      ),
+    ),
+  ]
+
   const todos = [...achados, ...lista.filter((w) => comuns.has(w.id))].sort((a, b) => a.name.localeCompare(b.name))
   return {
     total: todos.length,
     comuns: comuns.size,
-    workflows: todos.slice(0, 300).map((w) => ({ id: w.id, nome: w.name, comum: comuns.has(w.id) })),
+    workflows: todos
+      .slice(0, 300)
+      .map((w) => ({ id: w.id, nome: w.name, comum: comuns.has(w.id), filhos: filhosDe(w) })),
   }
 }
 

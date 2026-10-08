@@ -14,10 +14,11 @@ import {
   type OpcaoFiltro,
   type Previa,
 } from '../services/workflows'
+import { ArvoreWorkflows } from './ArvoreWorkflows'
 import { Alerta } from './ui/Alerta'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
-import { IconeCheck, IconeMais, IconeX } from './ui/Icones'
+import { IconeX } from './ui/Icones'
 import { Select } from './ui/Select'
 
 /** Espera o usuário parar de digitar antes de consultar a prévia. */
@@ -382,38 +383,19 @@ export function ExportarWorkflows() {
             ) : resultado && resultado.workflows.length === 0 ? (
               <Vazio>Nenhum workflow neste filtro.</Vazio>
             ) : (
-              <ul className="max-h-72 divide-y divide-slate-100 overflow-y-auto text-sm text-slate-600">
-                {resultado?.workflows.map((w) => {
-                  const jaAdicionado = idsEscolhidos.has(w.id)
-                  return (
-                    <li key={w.id} className="flex items-center justify-between gap-2 px-4 py-1.5">
-                      <span className="min-w-0 truncate" title={w.nome}>
-                        {w.nome}
-                        {w.comum && (
-                          <span
-                            className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500"
-                            title="Chamado por um dos workflows do filtro (sub-workflow)"
-                          >
-                            comum
-                          </span>
-                        )}
-                      </span>
-                      <BotaoLinha
-                        rotulo={jaAdicionado ? `${w.nome} já está na lista` : `Adicionar ${w.nome}`}
-                        aoClicar={() => adicionar([w])}
-                        desabilitado={jaAdicionado || cheia || baixando}
-                      >
-                        {jaAdicionado ? <IconeCheck /> : <IconeMais />}
-                      </BotaoLinha>
-                    </li>
-                  )
-                })}
+              <>
+                <ArvoreWorkflows
+                  itens={resultado?.workflows ?? []}
+                  jaAdicionados={idsEscolhidos}
+                  desabilitado={cheia || baixando}
+                  aoAdicionar={adicionar}
+                />
                 {resultado && total > resultado.workflows.length && (
-                  <li className="px-4 py-1.5 text-slate-400">
+                  <p className="border-t border-slate-100 px-4 py-1.5 text-sm text-slate-400">
                     …e mais {total - resultado.workflows.length}. Refine o filtro para ver o restante.
-                  </li>
+                  </p>
                 )}
-              </ul>
+              </>
             )}
           </Painel>
 

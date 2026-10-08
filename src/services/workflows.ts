@@ -63,6 +63,8 @@ export interface ItemWorkflow {
   nome: string
   /** Veio por ser chamado (sub-workflow) por um dos que casam com o filtro, e não pelo próprio filtro. */
   comum?: boolean
+  /** IDs dos workflows que este chama (Execute Workflow), para montar a árvore workflow > sub-workflow. */
+  filhos?: string[]
 }
 
 export interface Previa {
