@@ -38,20 +38,21 @@ function mensagemDe(e: unknown, padrao: string) {
   return e instanceof ApiError ? e.message : padrao
 }
 
+/** Os dois painéis (resultado e exportação) têm a mesma altura e rolam por dentro, lado a lado. */
 function Painel({ titulo, acao, children }: { titulo: string; acao?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex min-h-0 flex-col rounded-lg border border-slate-200/80">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-2.5">
-        <h4 className="text-sm font-medium text-slate-700">{titulo}</h4>
+    <section className="flex h-[36rem] min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200/80">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-2.5">
+        <h4 className="text-sm font-semibold text-slate-800">{titulo}</h4>
         {acao}
       </div>
-      {children}
-    </div>
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+    </section>
   )
 }
 
 function Vazio({ children }: { children: ReactNode }) {
-  return <p className="px-4 py-6 text-center text-sm text-slate-400">{children}</p>
+  return <p className="px-4 py-10 text-center text-sm text-slate-400">{children}</p>
 }
 
 function BotaoLinha({
@@ -383,30 +384,39 @@ export function ExportarWorkflows() {
 
   const ocupado = carregandoOpcoes || baixando
   const rotulos = instancias.find((i) => i.id === instancia)?.rotulos ?? ROTULOS_PADRAO
+  const filtrosAtivos = temFiltro(filtros) || Boolean(filtroPasta)
+
+  function limparFiltros() {
+    setErro(null)
+    setBaixado(null)
+    setFiltros({ ...SEM_FILTROS, comuns: filtros.comuns })
+    setFiltroPasta('')
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
-      <div className="space-y-6 px-6 py-6">
-        <Select
-          id="instancia"
-          label="Instância do n8n"
-          value={instancia}
-          disabled={carregandoInstancias || baixando}
-          onChange={(e) => setInstancia(e.target.value)}
-        >
-          <option value="">{carregandoInstancias ? 'Carregando…' : 'Selecione'}</option>
-          {instancias.map((i) => (
-            <option key={i.id} value={i.id}>
-              {i.nome}
-            </option>
-          ))}
-        </Select>
+      <div className="space-y-4 px-5 py-5">
+        {/* Faixa de filtros: tudo em uma linha, sem textos soltos (as explicações ficam em "Como funcionam") */}
+        <div className={`grid gap-3 sm:grid-cols-2 ${temPastas ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+          <Select
+            id="instancia"
+            label="Instância do n8n"
+            value={instancia}
+            disabled={carregandoInstancias || baixando}
+            onChange={(e) => setInstancia(e.target.value)}
+          >
+            <option value="">{carregandoInstancias ? 'Carregando…' : 'Selecione'}</option>
+            {instancias.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.nome}
+              </option>
+            ))}
+          </Select>
 
-        <div className={`grid gap-4 ${temPastas ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
           <Select
             id="filtro-cliente"
             label={rotulos.primeiro}
-            ajuda={rotulos.ajudaPrimeiro}
+            title={rotulos.ajudaPrimeiro}
             value={filtros.cliente}
             disabled={!instancia || ocupado}
             onChange={(e) => alterar('cliente', e.target.value)}
@@ -422,7 +432,7 @@ export function ExportarWorkflows() {
           <Select
             id="filtro-base"
             label={rotulos.segundo}
-            ajuda={rotulos.ajudaSegundo}
+            title={rotulos.ajudaSegundo}
             value={filtros.base}
             disabled={!instancia || ocupado}
             onChange={(e) => alterar('base', e.target.value)}
@@ -439,7 +449,7 @@ export function ExportarWorkflows() {
             <Select
               id="filtro-pasta"
               label="Pasta"
-              ajuda="Pasta do n8n em que o workflow está (inclui as de dentro)."
+              title="Pasta do n8n em que o workflow está (inclui as de dentro)"
               value={filtroPasta}
               disabled={!instancia || ocupado}
               onChange={(e) => setFiltroPasta(e.target.value)}
@@ -457,7 +467,7 @@ export function ExportarWorkflows() {
           <Campo
             id="filtro-busca"
             label="O nome contém"
-            ajuda="Procura o trecho em qualquer parte do nome."
+            title="Procura o trecho em qualquer parte do nome"
             placeholder="ex.: pedido"
             value={filtros.busca}
             disabled={!instancia || ocupado}
@@ -465,9 +475,41 @@ export function ExportarWorkflows() {
           />
         </div>
 
-        {instancia && carregandoPastas && (
-          <p className="text-[13px] text-slate-400">Carregando as pastas do n8n… a lista já pode ser usada.</p>
-        )}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          <label
+            className={`flex items-center gap-2 ${temFiltro(filtros) ? 'text-slate-700' : 'text-slate-400'}`}
+            title="Com qualquer filtro (inclusive o campo O nome contém), junta também os sub-workflows que os encontrados chamam (e os que esses chamam)"
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              checked={filtros.comuns}
+              disabled={!instancia || !temFiltro(filtros) || ocupado}
+              onChange={(e) => alterarComuns(e.target.checked)}
+            />
+            Incluir os workflows comuns
+            <span className="text-[13px] text-slate-400">(sub-workflows que eles chamam)</span>
+          </label>
+
+          <button type="button" className={CLASSE_ACAO_TEXTO} disabled={!filtrosAtivos || ocupado} onClick={limparFiltros}>
+            Limpar filtros
+          </button>
+
+          {instancia && carregandoPastas && <span className="text-[13px] text-slate-400">Carregando as pastas do n8n…</span>}
+
+          <details className="text-[13px] text-slate-500 sm:ml-auto">
+            <summary className="cursor-pointer select-none font-medium text-slate-600 hover:text-slate-900">
+              Como funcionam os filtros
+            </summary>
+            <p className="mt-2 max-w-2xl leading-relaxed">
+              Nesta instância os nomes seguem <code>{rotulos.padrao}</code>: em <code>LAB_Mercos_Pedido_Captura</code>,{' '}
+              <code>LAB</code> é o filtro “{rotulos.primeiro}” e <code>Mercos</code> é “{rotulos.segundo}”. A etiqueta
+              (tag) do workflow também vale nesses dois filtros. Os filtros se combinam, e sem nenhum a instância é
+              listada inteira. Workflows arquivados não entram.
+            </p>
+          </details>
+        </div>
+
         {instancia && erroPastas && (
           <p className="text-[13px] text-amber-700">
             Pastas indisponíveis nesta instância: {erroPastas} A chave da credencial precisa dos escopos de listar
@@ -475,35 +517,10 @@ export function ExportarWorkflows() {
           </p>
         )}
 
-        <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            Nesta instância os nomes seguem <code>{rotulos.padrao}</code>: em <code>LAB_Mercos_Pedido_Captura</code>,{' '}
-            <code>LAB</code> é o filtro “{rotulos.primeiro}” e <code>Mercos</code> é “{rotulos.segundo}”. A
-            etiqueta (tag) do workflow também vale nesses dois filtros. Os filtros se combinam, e sem nenhum a
-            instância é listada inteira. Workflows arquivados não entram.
-          </p>
+        {erro && <Alerta tom="erro">{erro}</Alerta>}
 
-          <label
-            className={`flex items-start gap-2.5 text-sm ${temFiltro(filtros) ? 'text-slate-700' : 'text-slate-400'}`}
-          >
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-              checked={filtros.comuns}
-              disabled={!instancia || !temFiltro(filtros) || ocupado}
-              onChange={(e) => alterarComuns(e.target.checked)}
-            />
-            <span>
-              Incluir os workflows comuns
-              <span className="block text-[13px] font-normal text-slate-500">
-                Com qualquer filtro (inclusive o campo “O nome contém”), junta também os sub-workflows que os
-                encontrados chamam (e os que esses chamam).
-              </span>
-            </span>
-          </label>
-        </div>
-
-        <div className="grid gap-4">
+        {/* Esquerda: o que há na instância. Direita: o que vai no ZIP. */}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <Painel
             titulo={
               !instancia
@@ -513,26 +530,9 @@ export function ExportarWorkflows() {
                   : `Resultado do filtro (${total})`
             }
             acao={
-              <button
-                type="button"
-                className={CLASSE_ACAO_TEXTO}
-                disabled={aAdicionar.length === 0 || cheia || baixando}
-                onClick={() => adicionar(aAdicionar)}
-              >
-                Adicionar todos{aAdicionar.length > 0 ? ` (${aAdicionar.length})` : ''}
-              </button>
-            }
-          >
-            {!instancia ? (
-              <Vazio>Escolha a instância.</Vazio>
-            ) : carregandoPrevia && !resultado ? (
-              <Vazio>Buscando workflows…</Vazio>
-            ) : resultado && visiveis.length === 0 ? (
-              <Vazio>Nenhum workflow neste filtro.</Vazio>
-            ) : (
-              <>
+              <div className="flex items-center gap-3">
                 {temPastas && (
-                  <div className="flex items-center gap-1 border-b border-slate-100 px-4 py-1.5" role="tablist" aria-label="Como mostrar o resultado">
+                  <div className="flex items-center gap-0.5 rounded-md bg-slate-100/80 p-0.5" role="tablist" aria-label="Como mostrar o resultado">
                     {(
                       [
                         { id: 'pastas', rotulo: 'Explorador' },
@@ -545,8 +545,8 @@ export function ExportarWorkflows() {
                         role="tab"
                         aria-selected={visao === v.id}
                         onClick={() => setVisao(v.id)}
-                        className={`rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors ${
-                          visao === v.id ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:text-slate-800'
+                        className={`rounded px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                          visao === v.id ? 'bg-surface text-slate-900 shadow-soft' : 'text-slate-500 hover:text-slate-800'
                         }`}
                       >
                         {v.rotulo}
@@ -554,6 +554,25 @@ export function ExportarWorkflows() {
                     ))}
                   </div>
                 )}
+                <button
+                  type="button"
+                  className={CLASSE_ACAO_TEXTO}
+                  disabled={aAdicionar.length === 0 || cheia || baixando}
+                  onClick={() => adicionar(aAdicionar)}
+                >
+                  Adicionar todos{aAdicionar.length > 0 ? ` (${aAdicionar.length})` : ''}
+                </button>
+              </div>
+            }
+          >
+            {!instancia ? (
+              <Vazio>Escolha a instância.</Vazio>
+            ) : carregandoPrevia && !resultado ? (
+              <Vazio>Buscando workflows…</Vazio>
+            ) : resultado && visiveis.length === 0 ? (
+              <Vazio>Nenhum workflow neste filtro.</Vazio>
+            ) : (
+              <>
                 {temPastas && visao === 'pastas' ? (
                   <ExploradorWorkflows
                     nomeRaiz={instancias.find((i) => i.id === instancia)?.nome ?? ''}
@@ -574,7 +593,7 @@ export function ExportarWorkflows() {
                 )}
                 {resultado?.avisos && resultado.avisos.dinamicos + resultado.avisos.naoResolvidos > 0 && (
                   <p
-                    className="border-t border-slate-100 px-4 py-1.5 text-[13px] text-amber-700"
+                    className="shrink-0 border-t border-slate-100 px-4 py-1.5 text-[13px] text-amber-700"
                     title={resultado.avisos.exemplos.join('\n')}
                   >
                     {resultado.avisos.naoResolvidos > 0 &&
@@ -586,7 +605,7 @@ export function ExportarWorkflows() {
                   </p>
                 )}
                 {resultado && !filtroPasta && total > resultado.workflows.length && (
-                  <p className="border-t border-slate-100 px-4 py-1.5 text-sm text-slate-400">
+                  <p className="shrink-0 border-t border-slate-100 px-4 py-1.5 text-sm text-slate-400">
                     …e mais {total - resultado.workflows.length}. Refine o filtro para ver o restante.
                   </p>
                 )}
@@ -607,51 +626,50 @@ export function ExportarWorkflows() {
               </button>
             }
           >
-            {escolhidos.length === 0 ? (
-              <Vazio>Adicione workflows do resultado do filtro. A lista se mantém ao trocar de filtro.</Vazio>
-            ) : (
-              <ul className="max-h-[26rem] divide-y divide-slate-100 overflow-y-auto text-sm text-slate-600">
-                {escolhidosOrdenados.map((w) => (
-                  <li key={w.id} className="flex items-center justify-between gap-2 px-4 py-1.5">
-                    <span
-                      className="min-w-0 flex-1 truncate"
-                      title={caminhoTexto(w.id) ? `${caminhoTexto(w.id)} / ${w.nome}` : w.nome}
-                    >
-                      {caminhoTexto(w.id) && <span className="text-[12px] text-slate-400">{caminhoTexto(w.id)} / </span>}
-                      {w.nome}
-                    </span>
-                    <BotaoLinha rotulo={`Remover ${w.nome}`} aoClicar={() => remover(w.id)} desabilitado={baixando}>
-                      <IconeX />
-                    </BotaoLinha>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {escolhidos.length === 0 ? (
+                <Vazio>Adicione workflows pelo resultado ao lado. A lista se mantém ao trocar de filtro.</Vazio>
+              ) : (
+                <ul className="divide-y divide-slate-100 text-sm text-slate-600">
+                  {escolhidosOrdenados.map((w) => (
+                    <li key={w.id} className="flex items-center justify-between gap-2 px-4 py-1.5">
+                      <span
+                        className="min-w-0 flex-1 truncate"
+                        title={caminhoTexto(w.id) ? `${caminhoTexto(w.id)} / ${w.nome}` : w.nome}
+                      >
+                        {caminhoTexto(w.id) && <span className="text-[12px] text-slate-400">{caminhoTexto(w.id)} / </span>}
+                        {w.nome}
+                      </span>
+                      <BotaoLinha rotulo={`Remover ${w.nome}`} aoClicar={() => remover(w.id)} desabilitado={baixando}>
+                        <IconeX />
+                      </BotaoLinha>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="shrink-0 space-y-2 border-t border-slate-100 bg-slate-50/50 p-3">
+              {cheia && (
+                <p className="text-[13px] text-amber-700">
+                  A lista chegou ao limite de {LIMITE_LISTA} workflows por ZIP. Baixe este e monte outro para o restante.
+                </p>
+              )}
+              {baixado && (
+                <Alerta tom="sucesso" titulo="ZIP gerado">
+                  {baixado}
+                </Alerta>
+              )}
+              <Botao type="button" className="w-full" onClick={baixar} disabled={escolhidos.length === 0 || baixando}>
+                {baixando ? 'Gerando ZIP…' : `Baixar ZIP${escolhidos.length > 0 ? ` (${escolhidos.length})` : ''}`}
+              </Botao>
+              <p className="text-[12px] leading-snug text-slate-500">
+                <strong className="font-semibold text-amber-700">Cuidado:</strong> os JSONs podem conter senhas e tokens em
+                texto puro dentro dos nodes. Guarde o ZIP com cuidado; cada exportação fica registrada com o seu e-mail e
+                os nomes dos workflows.
+              </p>
+            </div>
           </Painel>
-        </div>
-
-        {cheia && (
-          <Alerta tom="aviso">
-            A lista chegou ao limite de {LIMITE_LISTA} workflows por ZIP. Baixe este e monte outro para o restante.
-          </Alerta>
-        )}
-
-        <Alerta tom="aviso" titulo="Cuidado com o arquivo baixado">
-          Os JSONs podem conter senhas e tokens em texto puro dentro dos nodes. Guarde o ZIP com cuidado: cada
-          exportação fica registrada com o seu e-mail e os nomes dos workflows exportados.
-        </Alerta>
-
-        {erro && <Alerta tom="erro">{erro}</Alerta>}
-        {baixado && (
-          <Alerta tom="sucesso" titulo="ZIP gerado">
-            {baixado}
-          </Alerta>
-        )}
-
-        <div>
-          <Botao type="button" onClick={baixar} disabled={escolhidos.length === 0 || baixando}>
-            {baixando ? 'Gerando ZIP…' : `Baixar ZIP${escolhidos.length > 0 ? ` (${escolhidos.length})` : ''}`}
-          </Botao>
         </div>
       </div>
     </div>

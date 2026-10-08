@@ -118,9 +118,9 @@ export function ArvoreWorkflows({ itens, jaAdicionados, desabilitado, aoAdiciona
   }
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       {comFilhos.length > 0 && (
-        <div className="flex items-center justify-end gap-3 border-b border-slate-100 px-4 py-1.5 text-[13px]">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-b border-slate-100 px-4 py-1.5 text-[13px]">
           <button
             type="button"
             className="font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
@@ -138,7 +138,7 @@ export function ArvoreWorkflows({ itens, jaAdicionados, desabilitado, aoAdiciona
         </div>
       )}
 
-      <ul role="tree" className="max-h-72 overflow-y-auto text-sm text-slate-600">
+      <ul role="tree" className="min-h-0 flex-1 overflow-y-auto text-sm text-slate-600">
         {linhas.map(({ chave, item, nivel, filhos, aberto }) => {
           const jaAdicionado = jaAdicionados.has(item.id)
           const arvore = filhos.length > 0 ? comDescendentes(item) : []

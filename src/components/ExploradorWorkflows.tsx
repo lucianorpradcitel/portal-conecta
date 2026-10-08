@@ -40,7 +40,7 @@ const CLASSE_ACAO =
 /**
  * Resultado do filtro como o explorador de arquivos: o caminho em cima (instância / pasta / pasta / workflow),
  * o painel de pastas à esquerda e, à direita, o que há dentro da pasta aberta. Clicar numa pasta entra nela;
- * o botão de subir, o painel e o caminho levam de volta.
+ * o botão de subir, o painel e o caminho levam de volta. Ocupa a altura que o painel dá (o conteúdo rola).
  *
  * Só aparece o que está no resultado do filtro: pasta sem nenhum workflow do filtro não é listada, e quem
  * está fora de pasta fica solto na raiz. Cada workflow mostra os sub-workflows que chama (setinha), que
@@ -162,21 +162,21 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
           className={`flex items-center gap-0.5 rounded-md pr-1 text-[13px] ${
             ativa ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50'
           }`}
-          style={{ paddingLeft: 4 + nivel * 14 }}
+          style={{ paddingLeft: 2 + nivel * 12 }}
         >
           {no.pastas.length > 0 ? (
             <button
               type="button"
               aria-label={aberta ? `Recolher ${no.nome}` : `Expandir ${no.nome}`}
               onClick={() => setNavAbertas((a) => alternar(a, no.id))}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 hover:text-slate-800"
+              className="flex h-5 w-4 shrink-0 items-center justify-center rounded text-slate-400 hover:text-slate-800"
             >
               <span className={`h-3 w-3 transition-transform duration-150 ${aberta ? 'rotate-90' : ''}`}>
                 <IconeSetaDireita />
               </span>
             </button>
           ) : (
-            <span className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span className="h-5 w-4 shrink-0" aria-hidden="true" />
           )}
           <button
             type="button"
@@ -201,9 +201,9 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
   const raiz = porId.get(RAIZ)!
 
   return (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Barra de caminho */}
-      <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-2">
         <button
           type="button"
           onClick={subir}
@@ -240,7 +240,7 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
                 type="button"
                 onClick={() => entrar(id)}
                 aria-current={i === caminho.length - 1 && !selecionadoItem ? 'page' : undefined}
-                className="max-w-[16rem] truncate rounded px-1 py-0.5 font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                className="max-w-[14rem] truncate rounded px-1 py-0.5 font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900"
               >
                 {porId.get(id)?.nome}
               </button>
@@ -251,7 +251,7 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
               <span className="text-slate-300" aria-hidden="true">
                 /
               </span>
-              <span className="max-w-[20rem] truncate px-1 py-0.5 font-semibold text-brand-700" title={selecionadoItem.nome}>
+              <span className="max-w-[18rem] truncate px-1 py-0.5 font-semibold text-brand-700" title={selecionadoItem.nome}>
                 {selecionadoItem.nome}
               </span>
             </>
@@ -269,11 +269,11 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
         </button>
       </div>
 
-      <div className="flex min-h-0">
+      <div className="flex min-h-0 flex-1">
         {/* Painel de navegação */}
         <aside
           aria-label="Pastas"
-          className="hidden max-h-[26rem] w-56 shrink-0 overflow-y-auto border-r border-slate-100 py-1.5 pr-1 md:block"
+          className="hidden w-44 shrink-0 overflow-y-auto border-r border-slate-100 py-1.5 pr-1 lg:block"
         >
           <ul role="tree">
             <li role="treeitem" aria-selected={idAtual === RAIZ}>
@@ -296,17 +296,16 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
         </aside>
 
         {/* Conteúdo da pasta aberta */}
-        <div className="min-w-0 flex-1">
-          <div className="hidden grid-cols-[minmax(0,1fr)_110px_auto] gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500 sm:grid">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/60 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">
             <span>Nome</span>
-            <span>Conteúdo</span>
-            <span className="min-w-[118px] text-right">Ações</span>
+            <span>Ações</span>
           </div>
 
           {linhas.length === 0 ? (
             <p className="px-4 py-10 text-center text-sm text-slate-400">Nada nesta pasta para o filtro atual.</p>
           ) : (
-            <ul className="max-h-[26rem] divide-y divide-slate-50 overflow-y-auto text-sm text-slate-600">
+            <ul className="min-h-0 flex-1 divide-y divide-slate-50 overflow-y-auto text-sm text-slate-600">
               {linhas.map((linha) => {
                 if (linha.tipo === 'pasta') {
                   const { no } = linha
@@ -316,34 +315,32 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
                     <li
                       key={linha.chave}
                       onDoubleClick={() => entrar(no.id)}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-1 hover:bg-slate-50/80 sm:grid-cols-[minmax(0,1fr)_110px_auto]"
+                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50/80"
                     >
                       <button
                         type="button"
                         onClick={() => entrar(no.id)}
                         title={`Abrir ${no.nome}`}
-                        className="flex min-w-0 items-center gap-2 py-0.5 text-left"
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
                       >
                         <span className="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true">
                           <IconePasta />
                         </span>
                         <span className="truncate font-medium text-slate-700">{no.nome}</span>
+                        <span className="shrink-0 text-[11px] text-slate-400">
+                          {todos.length} workflow{todos.length === 1 ? '' : 's'}
+                        </span>
                       </button>
-                      <span className="hidden text-[12px] text-slate-400 sm:block">
-                        {todos.length} workflow{todos.length === 1 ? '' : 's'}
-                      </span>
-                      <span className="flex min-w-[118px] items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          disabled={desabilitado || faltam.length === 0}
-                          onClick={() => aoAdicionar(todos)}
-                          title={`Adicionar todos os workflows de ${no.nome} (${todos.length})`}
-                          aria-label={`Adicionar todos os workflows da pasta ${no.nome}`}
-                          className={CLASSE_ACAO}
-                        >
-                          pasta toda
-                        </button>
-                      </span>
+                      <button
+                        type="button"
+                        disabled={desabilitado || faltam.length === 0}
+                        onClick={() => aoAdicionar(todos)}
+                        title={`Adicionar todos os workflows de ${no.nome} (${todos.length})`}
+                        aria-label={`Adicionar todos os workflows da pasta ${no.nome}`}
+                        className={CLASSE_ACAO}
+                      >
+                        pasta toda
+                      </button>
                     </li>
                   )
                 }
@@ -358,11 +355,9 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
                   <li
                     key={linha.chave}
                     aria-selected={marcado}
-                    className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-1 sm:grid-cols-[minmax(0,1fr)_110px_auto] ${
-                      marcado ? 'bg-brand-50/70' : 'hover:bg-slate-50/80'
-                    }`}
+                    className={`flex items-center gap-2 px-3 py-1.5 ${marcado ? 'bg-brand-50/70' : 'hover:bg-slate-50/80'}`}
                   >
-                    <div className="flex min-w-0 items-center gap-1" style={{ paddingLeft: nivel * 20 }}>
+                    <div className="flex min-w-0 flex-1 items-center gap-1" style={{ paddingLeft: nivel * 20 }}>
                       {filhos.length > 0 ? (
                         <button
                           type="button"
@@ -380,8 +375,8 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
                       <button
                         type="button"
                         onClick={() => setSelecionado(marcado ? null : item.id)}
-                        title={item.nome}
-                        className="flex min-w-0 items-center gap-2 py-0.5 text-left"
+                        title={dicaPasta ? `${dicaPasta} / ${item.nome}` : item.nome}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
                       >
                         <span className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true">
                           <IconeArquivo />
@@ -395,36 +390,32 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
                             comum
                           </span>
                         )}
-                        {dicaPasta && <span className="hidden shrink-0 truncate text-[11px] text-slate-400 lg:inline">em {dicaPasta}</span>}
+                        {filhos.length > 0 && <span className="shrink-0 text-[11px] text-slate-400">chama {filhos.length}</span>}
+                        {dicaPasta && <span className="hidden shrink-0 truncate text-[11px] text-slate-400 xl:inline">em {dicaPasta}</span>}
                       </button>
                     </div>
-                    <span className="hidden text-[12px] text-slate-400 sm:block">
-                      {filhos.length > 0 ? `chama ${filhos.length}` : 'workflow'}
-                    </span>
-                    <span className="flex min-w-[118px] items-center justify-end gap-1">
-                      {filhos.length > 0 && (
-                        <button
-                          type="button"
-                          disabled={desabilitado || faltamNaArvore.length === 0}
-                          onClick={() => aoAdicionar(arvore)}
-                          title={`Adicionar ${item.nome} com os sub-workflows (${arvore.length})`}
-                          aria-label={`Adicionar ${item.nome} com os sub-workflows`}
-                          className={CLASSE_ACAO}
-                        >
-                          com subs
-                        </button>
-                      )}
+                    {filhos.length > 0 && (
                       <button
                         type="button"
-                        aria-label={jaAdicionado ? `${item.nome} já está na lista` : `Adicionar ${item.nome}`}
-                        title={jaAdicionado ? `${item.nome} já está na lista` : `Adicionar ${item.nome}`}
-                        onClick={() => aoAdicionar([item])}
-                        disabled={jaAdicionado || desabilitado}
-                        className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
+                        disabled={desabilitado || faltamNaArvore.length === 0}
+                        onClick={() => aoAdicionar(arvore)}
+                        title={`Adicionar ${item.nome} com os sub-workflows (${arvore.length})`}
+                        aria-label={`Adicionar ${item.nome} com os sub-workflows`}
+                        className={CLASSE_ACAO}
                       >
-                        {jaAdicionado ? <IconeCheck /> : <IconeMais />}
+                        com subs
                       </button>
-                    </span>
+                    )}
+                    <button
+                      type="button"
+                      aria-label={jaAdicionado ? `${item.nome} já está na lista` : `Adicionar ${item.nome}`}
+                      title={jaAdicionado ? `${item.nome} já está na lista` : `Adicionar ${item.nome}`}
+                      onClick={() => aoAdicionar([item])}
+                      disabled={jaAdicionado || desabilitado}
+                      className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
+                    >
+                      {jaAdicionado ? <IconeCheck /> : <IconeMais />}
+                    </button>
                   </li>
                 )
               })}
@@ -432,7 +423,7 @@ export function ExploradorWorkflows({ nomeRaiz, itens, pastas, mapa, jaAdicionad
           )}
 
           {/* Barra de status, como a do explorador */}
-          <p className="border-t border-slate-100 px-3 py-1.5 text-[12px] text-slate-400">
+          <p className="shrink-0 border-t border-slate-100 px-3 py-1.5 text-[12px] text-slate-400">
             {noAtual.pastas.length} pasta{noAtual.pastas.length === 1 ? '' : 's'} · {noAtual.itens.length} workflow
             {noAtual.itens.length === 1 ? '' : 's'} aqui · {aqui.length} no total
           </p>
