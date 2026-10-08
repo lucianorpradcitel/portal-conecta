@@ -22,6 +22,7 @@ import {
 } from '../services/workflows'
 import { ArvoreWorkflows } from './ArvoreWorkflows'
 import { ExploradorWorkflows } from './ExploradorWorkflows'
+import { dividirEmZips } from './zips'
 import { Alerta } from './ui/Alerta'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
@@ -378,46 +379,29 @@ export function ExportarWorkflows() {
   const alvo = baixaTudo ? visiveis : escolhidos
 
   /**
-   * Divide o que vai ser baixado em ZIPs. A ordem é a de um explorador (por pasta e nome): cada parte leva as pastas
-   * quase inteiras, e as partes juntas, extraídas na mesma pasta, formam a hierarquia completa. Um ZIP fecha quando
-   * chega a LIMITE_ZIP workflows (o limite do servidor) ou quando a URL do pedido chegaria a LIMITE_CONSULTA
-   * caracteres (acima de ~8 KB o nginx responde 414).
+   * Divide o que vai ser baixado em ZIPs sem separar pastas: o que não cabe mais no ZIP atual vai inteiro para o
+   * próximo, e só uma pasta que sozinha passa do limite é dividida (ver dividirEmZips). Um ZIP está cheio com
+   * LIMITE_ZIP workflows (o limite do servidor) ou quando a URL do pedido chegaria a LIMITE_CONSULTA caracteres
+   * (acima de ~8 KB o nginx responde 414). As partes, extraídas na mesma pasta, formam a hierarquia completa.
    */
   const partes = useMemo(() => {
     if (!instancia || alvo.length === 0) {
       return [] as ItemWorkflow[][]
     }
-    const ordenados = [...alvo].sort((a, b) =>
-      `${caminhoTexto(a.id)}/${a.nome}`.localeCompare(`${caminhoTexto(b.id)}/${b.nome}`, 'pt-BR', {
-        sensitivity: 'base',
-        numeric: true,
-      }),
-    )
     const pastaDe = temPastas ? pastaNoZip : undefined
-    const saida: ItemWorkflow[][] = []
-    let atual: ItemWorkflow[] = []
-    for (const w of ordenados) {
-      const tentativa = [...atual, w]
-      const cheio =
-        atual.length > 0 &&
-        (tentativa.length > LIMITE_ZIP ||
-          consultaZip(
-            instancia,
-            tentativa.map((i) => i.id),
-            pastaDe,
-          ).length > LIMITE_CONSULTA)
-      if (cheio) {
-        saida.push(atual)
-        atual = [w]
-      } else {
-        atual = tentativa
-      }
+    const caminhoDe = (id: string) => {
+      const pasta = mapaPastas?.workflows[id]
+      return pasta ? caminhoDaPasta(pasta) : []
     }
-    if (atual.length > 0) {
-      saida.push(atual)
-    }
-    return saida
-    // caminhoTexto e pastaNoZip dependem só de mapaPastas e pastaPorId
+    const cabe = (lista: ItemWorkflow[]) =>
+      lista.length <= LIMITE_ZIP &&
+      consultaZip(
+        instancia,
+        lista.map((i) => i.id),
+        pastaDe,
+      ).length <= LIMITE_CONSULTA
+    return dividirEmZips(alvo, caminhoDe, cabe)
+    // caminhoDaPasta e pastaNoZip dependem só de mapaPastas e pastaPorId
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alvo, instancia, temPastas, mapaPastas, pastaPorId])
   const totalZips = partes.length
