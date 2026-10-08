@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from '
 import type { ItemWorkflow, PastaN8n } from '../services/workflows'
 import { RAIZ, itensDoNo, montarArvore, type NoPasta } from './pastas'
 import { DivisorVertical, gravarPreferencia, lerPreferencia } from './ui/DivisorVertical'
+import { CLASSE_ADICIONADO, CLASSE_MAIS, CLASSE_MENOS } from './ui/estilosAcao'
 import {
   IconeArquivo,
   IconeCasa,
@@ -395,7 +396,7 @@ export function ExploradorWorkflows({
                           onClick={() => aoRemover(todos)}
                           title="Remover pasta toda da lista"
                           aria-label={`Remover da lista todos os workflows da pasta ${no.nome}`}
-                          className="h-6 w-6 shrink-0 rounded-md p-1 text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                          className={CLASSE_MENOS}
                         >
                           <IconeMenos />
                         </button>
@@ -406,7 +407,7 @@ export function ExploradorWorkflows({
                           onClick={() => aoAdicionar(todos)}
                           title="Adicionar pasta toda"
                           aria-label={`Adicionar pasta toda: ${no.nome} (${faltam.length} workflows)`}
-                          className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
+                          className={CLASSE_MAIS}
                         >
                           <IconeMais />
                         </button>
@@ -482,7 +483,7 @@ export function ExploradorWorkflows({
                       title={jaAdicionado ? `${item.nome} já está na lista` : `Adicionar ${item.nome}`}
                       onClick={() => aoAdicionar([item])}
                       disabled={jaAdicionado || desabilitado}
-                      className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
+                      className={jaAdicionado ? CLASSE_ADICIONADO : CLASSE_MAIS}
                     >
                       {jaAdicionado ? <IconeCheck /> : <IconeMais />}
                     </button>

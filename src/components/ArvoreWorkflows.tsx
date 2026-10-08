@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ItemWorkflow } from '../services/workflows'
+import { CLASSE_ADICIONADO, CLASSE_MAIS } from './ui/estilosAcao'
 import { IconeCheck, IconeMais, IconeSetaDireita } from './ui/Icones'
 
 interface Props {
@@ -211,7 +212,7 @@ export function ArvoreWorkflows({ itens, jaAdicionados, desabilitado, aoAdiciona
                 title={jaAdicionado ? `${item.nome} já está na lista` : `Adicionar ${item.nome}`}
                 onClick={() => aoAdicionar([item])}
                 disabled={jaAdicionado || desabilitado}
-                className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
+                className={jaAdicionado ? CLASSE_ADICIONADO : CLASSE_MAIS}
               >
                 {jaAdicionado ? <IconeCheck /> : <IconeMais />}
               </button>

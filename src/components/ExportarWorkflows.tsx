@@ -26,6 +26,7 @@ import { Alerta } from './ui/Alerta'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
 import { DivisorVertical, gravarPreferencia, lerPreferencia } from './ui/DivisorVertical'
+import { CLASSE_MENOS } from './ui/estilosAcao'
 import { IconeMenos } from './ui/Icones'
 import { Select } from './ui/Select'
 
@@ -82,7 +83,7 @@ function BotaoLinha({
       title={rotulo}
       onClick={aoClicar}
       disabled={desabilitado}
-      className="h-6 w-6 shrink-0 rounded-md p-1 text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+      className={CLASSE_MENOS}
     >
       {children}
     </button>
