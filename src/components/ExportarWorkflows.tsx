@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ApiError } from '../services/api'
 import {
   LIMITE_LISTA,
+  ROTULOS_PADRAO,
   SEM_FILTROS,
   baixarZip,
   listarInstancias,
   listarOpcoes,
   previa,
-  temFiltro,
   type Filtros,
   type InstanciaN8n,
   type ItemWorkflow,
@@ -72,13 +72,12 @@ function BotaoLinha({
 }
 
 /**
- * Escolhe a instância do n8n, filtra os workflows por categoria, plataforma e/ou trecho do nome e monta
- * a lista final do que será exportado. Os nomes seguem Categoria_Plataforma_Etapa (ex.:
- * LAB_Mercos_Pedido_Captura), então "plataforma = Mercos" pega a Mercos de todas as categorias.
+ * Escolhe a instância do n8n, filtra os workflows e monta a lista final do que será exportado. Ao escolher
+ * a instância, ela já é listada inteira; os filtros só refinam.
  *
- * Por dentro, a categoria ainda se chama `cliente` e a plataforma `base` (estado, parâmetros do
- * webhook portal-wf e chaves da resposta). Só os textos da tela mudaram: renomear o contrato exigiria
- * republicar o workflow do n8n sem ganho para quem usa.
+ * Cada instância nomeia os workflows de um jeito (a produção usa Categoria_Plataforma_Etapa, as outras
+ * Cliente_Base_Etapa), e os rótulos dos dois filtros vêm do n8n junto com a lista de instâncias. Por dentro,
+ * o primeiro filtro é sempre `cliente` e o segundo `base` (estado, parâmetros do webhook portal-wf).
  *
  * Há duas listas: o resultado do filtro (que muda a cada busca) e a lista para exportar (que
  * acumula entre buscas). O ZIP leva exatamente a segunda, identificada por ID.
@@ -167,7 +166,7 @@ export function ExportarWorkflows() {
   // O resultado acompanha os filtros.
   useEffect(() => {
     setResultado(null)
-    if (!instancia || !temFiltro(filtros)) {
+    if (!instancia) {
       setCarregandoPrevia(false)
       return
     }
@@ -204,10 +203,16 @@ export function ExportarWorkflows() {
   const cheia = escolhidos.length >= LIMITE_LISTA
   const total = resultado?.total ?? 0
 
-  function alterar(campo: keyof Filtros, valor: string) {
+  function alterar(campo: 'cliente' | 'base' | 'busca', valor: string) {
     setErro(null)
     setBaixado(null)
     setFiltros((atual) => ({ ...atual, [campo]: valor }))
+  }
+
+  function alterarComuns(valor: boolean) {
+    setErro(null)
+    setBaixado(null)
+    setFiltros((atual) => ({ ...atual, comuns: valor }))
   }
 
   function ordenar(lista: ItemWorkflow[]) {
@@ -258,6 +263,7 @@ export function ExportarWorkflows() {
   }
 
   const ocupado = carregandoOpcoes || baixando
+  const rotulos = instancias.find((i) => i.id === instancia)?.rotulos ?? ROTULOS_PADRAO
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
@@ -280,13 +286,13 @@ export function ExportarWorkflows() {
         <div className="grid gap-4 sm:grid-cols-3">
           <Select
             id="filtro-cliente"
-            label="Categoria do workflow"
-            ajuda="Primeira parte do nome (ex.: MASTER, LAB)."
+            label={rotulos.primeiro}
+            ajuda={rotulos.ajudaPrimeiro}
             value={filtros.cliente}
             disabled={!instancia || ocupado}
             onChange={(e) => alterar('cliente', e.target.value)}
           >
-            <option value="">{carregandoOpcoes ? 'Carregando…' : 'Todas as categorias'}</option>
+            <option value="">{carregandoOpcoes ? 'Carregando…' : rotulos.todosPrimeiro}</option>
             {clientes.map((c) => (
               <option key={c.nome} value={c.nome}>
                 {c.nome} ({c.total})
@@ -296,13 +302,13 @@ export function ExportarWorkflows() {
 
           <Select
             id="filtro-base"
-            label="Plataforma"
-            ajuda="Segunda parte do nome (ex.: Tray, Mercos)."
+            label={rotulos.segundo}
+            ajuda={rotulos.ajudaSegundo}
             value={filtros.base}
             disabled={!instancia || ocupado}
             onChange={(e) => alterar('base', e.target.value)}
           >
-            <option value="">{carregandoOpcoes ? 'Carregando…' : 'Todas as plataformas'}</option>
+            <option value="">{carregandoOpcoes ? 'Carregando…' : rotulos.todosSegundo}</option>
             {bases.map((b) => (
               <option key={b.nome} value={b.nome}>
                 {b.nome} ({b.total})
@@ -321,16 +327,38 @@ export function ExportarWorkflows() {
           />
         </div>
 
-        <p className="text-sm text-slate-500">
-          Os nomes seguem <code>Categoria_Plataforma_Etapa</code>: em <code>LAB_Mercos_Pedido_Captura</code>, a
-          categoria é <code>LAB</code> e a plataforma é <code>Mercos</code>. Os filtros se combinam; para pegar a
-          Mercos de todas as categorias, escolha só a plataforma. Workflows arquivados não entram.
-        </p>
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">
+            Nesta instância os nomes seguem <code>{rotulos.padrao}</code>: em <code>LAB_Mercos_Pedido_Captura</code>,{' '}
+            <code>LAB</code> é o filtro “{rotulos.primeiro}” e <code>Mercos</code> é “{rotulos.segundo}”. A
+            etiqueta (tag) do workflow também vale nesses dois filtros. Os filtros se combinam, e sem nenhum a
+            instância é listada inteira. Workflows arquivados não entram.
+          </p>
+
+          <label
+            className={`flex items-start gap-2.5 text-sm ${filtros.base ? 'text-slate-700' : 'text-slate-400'}`}
+          >
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              checked={filtros.comuns}
+              disabled={!instancia || !filtros.base || ocupado}
+              onChange={(e) => alterarComuns(e.target.checked)}
+            />
+            <span>
+              Incluir os workflows comuns
+              <span className="block text-[13px] font-normal text-slate-500">
+                Com uma {rotulos.segundo.toLowerCase()} escolhida, junta também os sub-workflows que os encontrados chamam
+                (e os que esses chamam).
+              </span>
+            </span>
+          </label>
+        </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Painel
             titulo={
-              !instancia || !temFiltro(filtros)
+              !instancia
                 ? 'Resultado do filtro'
                 : carregandoPrevia
                   ? 'Resultado do filtro: buscando…'
@@ -349,8 +377,8 @@ export function ExportarWorkflows() {
           >
             {!instancia ? (
               <Vazio>Escolha a instância.</Vazio>
-            ) : !temFiltro(filtros) ? (
-              <Vazio>Escolha ao menos um filtro para listar workflows.</Vazio>
+            ) : carregandoPrevia && !resultado ? (
+              <Vazio>Buscando workflows…</Vazio>
             ) : resultado && resultado.workflows.length === 0 ? (
               <Vazio>Nenhum workflow neste filtro.</Vazio>
             ) : (
@@ -361,6 +389,14 @@ export function ExportarWorkflows() {
                     <li key={w.id} className="flex items-center justify-between gap-2 px-4 py-1.5">
                       <span className="min-w-0 truncate" title={w.nome}>
                         {w.nome}
+                        {w.comum && (
+                          <span
+                            className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500"
+                            title="Chamado por um dos workflows do filtro (sub-workflow)"
+                          >
+                            comum
+                          </span>
+                        )}
                       </span>
                       <BotaoLinha
                         rotulo={jaAdicionado ? `${w.nome} já está na lista` : `Adicionar ${w.nome}`}
