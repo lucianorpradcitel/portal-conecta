@@ -53,7 +53,7 @@ export interface Filtros {
   base: string
   /** Trecho que o nome do workflow precisa conter. */
   busca: string
-  /** Com uma plataforma escolhida, junta os workflows comuns: os sub-workflows que os encontrados chamam. */
+  /** Com algum filtro ativo, junta os workflows comuns: os sub-workflows que os encontrados chamam. */
   comuns: boolean
 }
 
@@ -67,10 +67,21 @@ export interface ItemWorkflow {
   filhos?: string[]
 }
 
+export interface AvisosChamadas {
+  /** Chamadas feitas por expressão (={{ }}): o destino só existe na execução, então não dá para seguir. */
+  dinamicos: number
+  /** Chamadas a um workflow que não existe na instância ou está arquivado. */
+  naoResolvidos: number
+  /** Alguns exemplos ("origem -> destino"), para quem for investigar. */
+  exemplos: string[]
+}
+
 export interface Previa {
   total: number
   /** Quantos dos `total` são comuns. */
   comuns?: number
+  /** Chamadas entre workflows que não deu para seguir ao montar a árvore e os comuns. */
+  avisos?: AvisosChamadas
   /** Workflows que casam com os filtros (até LIMITE_LISTA). */
   workflows: ItemWorkflow[]
 }
@@ -79,6 +90,11 @@ export interface Previa {
 export const LIMITE_LISTA = 300
 
 export const SEM_FILTROS: Filtros = { cliente: '', base: '', busca: '', comuns: true }
+
+/** Sem nenhum filtro a instância já é listada inteira, então não há "comuns" a juntar. */
+export function temFiltro(filtros: Filtros): boolean {
+  return Boolean(filtros.cliente || filtros.base || filtros.busca.trim())
+}
 
 function consulta(acao: string, instancia: string, filtros?: Filtros): string {
   const params = new URLSearchParams({ acao, instancia })
@@ -92,7 +108,7 @@ function consulta(acao: string, instancia: string, filtros?: Filtros): string {
     if (filtros.busca.trim()) {
       params.set('busca', filtros.busca.trim())
     }
-    if (filtros.comuns && filtros.base) {
+    if (filtros.comuns && temFiltro(filtros)) {
       params.set('comuns', '1')
     }
   }

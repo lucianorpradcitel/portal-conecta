@@ -8,6 +8,7 @@ import {
   listarInstancias,
   listarOpcoes,
   previa,
+  temFiltro,
   type Filtros,
   type InstanciaN8n,
   type ItemWorkflow,
@@ -337,20 +338,20 @@ export function ExportarWorkflows() {
           </p>
 
           <label
-            className={`flex items-start gap-2.5 text-sm ${filtros.base ? 'text-slate-700' : 'text-slate-400'}`}
+            className={`flex items-start gap-2.5 text-sm ${temFiltro(filtros) ? 'text-slate-700' : 'text-slate-400'}`}
           >
             <input
               type="checkbox"
               className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
               checked={filtros.comuns}
-              disabled={!instancia || !filtros.base || ocupado}
+              disabled={!instancia || !temFiltro(filtros) || ocupado}
               onChange={(e) => alterarComuns(e.target.checked)}
             />
             <span>
               Incluir os workflows comuns
               <span className="block text-[13px] font-normal text-slate-500">
-                Com uma {rotulos.segundo.toLowerCase()} escolhida, junta também os sub-workflows que os encontrados chamam
-                (e os que esses chamam).
+                Com qualquer filtro (inclusive o campo “O nome contém”), junta também os sub-workflows que os
+                encontrados chamam (e os que esses chamam).
               </span>
             </span>
           </label>
@@ -390,6 +391,19 @@ export function ExportarWorkflows() {
                   desabilitado={cheia || baixando}
                   aoAdicionar={adicionar}
                 />
+                {resultado?.avisos && resultado.avisos.dinamicos + resultado.avisos.naoResolvidos > 0 && (
+                  <p
+                    className="border-t border-slate-100 px-4 py-1.5 text-[13px] text-amber-700"
+                    title={resultado.avisos.exemplos.join('\n')}
+                  >
+                    {resultado.avisos.naoResolvidos > 0 &&
+                      `${resultado.avisos.naoResolvidos} chamada(s) a workflow inexistente ou arquivado`}
+                    {resultado.avisos.naoResolvidos > 0 && resultado.avisos.dinamicos > 0 && '; '}
+                    {resultado.avisos.dinamicos > 0 &&
+                      `${resultado.avisos.dinamicos} chamada(s) por expressão`}{' '}
+                    não puderam ser seguidas, então podem faltar sub-workflows. Passe o mouse para ver exemplos.
+                  </p>
+                )}
                 {resultado && total > resultado.workflows.length && (
                   <p className="border-t border-slate-100 px-4 py-1.5 text-sm text-slate-400">
                     …e mais {total - resultado.workflows.length}. Refine o filtro para ver o restante.

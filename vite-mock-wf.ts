@@ -57,7 +57,7 @@ const WORKFLOWS: Record<string, Wf[]> = {
     { id: 'p07', name: 'MASTER_Cilia_Orcamento', tags: ['master', 'cilia'] },
     { id: 'p08', name: 'TOOLS_Admin_Limpar_Execucoes', tags: ['tools'] },
     { id: 'p09', name: 'TOOLS_Admin_Reprocessar_Pedido', tags: ['tools'] },
-    { id: 'p10', name: 'LEGADO_Tray_Estoque_Antigo', tags: ['legado', 'tray'] },
+    { id: 'p10', name: 'LEGADO_Tray_Estoque_Antigo', tags: ['legado', 'tray'], chama: ['SUB_Que_Foi_Apagado'] },
     { id: 'p11', name: 'Portal_Acesso' },
     { id: 'p12', name: 'Portal_WF_Exportar' },
     { id: 'p13', name: 'SUB_Retry', chama: ['SUB_Log'] },
@@ -114,7 +114,7 @@ function previa(lista: Wf[], q: URLSearchParams) {
   const achados = lista.filter(casa)
 
   const comuns = new Set<string>()
-  if (base && /^(1|true|sim)$/i.test(q.get('comuns') ?? '')) {
+  if ((cliente || base || busca) && /^(1|true|sim)$/i.test(q.get('comuns') ?? '')) {
     const resolver = (ref: string) => lista.filter((w) => w.id === ref || minus(w.name) === minus(ref))
     const jaTem = new Set(achados.map((w) => w.id))
     const fila = [...achados]
@@ -140,6 +140,19 @@ function previa(lista: Wf[], q: URLSearchParams) {
     ),
   ]
 
+  // Chamadas que não dá para seguir: para um workflow inexistente ou por expressão (={{ }}).
+  const naoResolvidos = new Set<string>()
+  const dinamicos = new Set<string>()
+  for (const w of lista) {
+    for (const ref of w.chama ?? []) {
+      if (ref.startsWith('=')) {
+        dinamicos.add(`${w.name} / ${ref}`)
+      } else if (!lista.some((x) => x.id === ref || minus(x.name) === minus(ref))) {
+        naoResolvidos.add(`${w.name} -> ${ref}`)
+      }
+    }
+  }
+
   const todos = [...achados, ...lista.filter((w) => comuns.has(w.id))].sort((a, b) => a.name.localeCompare(b.name))
   return {
     total: todos.length,
@@ -147,6 +160,11 @@ function previa(lista: Wf[], q: URLSearchParams) {
     workflows: todos
       .slice(0, 300)
       .map((w) => ({ id: w.id, nome: w.name, comum: comuns.has(w.id), filhos: filhosDe(w) })),
+    avisos: {
+      dinamicos: dinamicos.size,
+      naoResolvidos: naoResolvidos.size,
+      exemplos: [...naoResolvidos, ...dinamicos].slice(0, 12),
+    },
   }
 }
 
