@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ApiError } from '../services/api'
 import {
+  LIMITE_CONSULTA,
   LIMITE_LISTA,
   LIMITE_ZIP,
   ROTULOS_PADRAO,
   SEM_FILTROS,
   baixarZip,
+  consultaZip,
   listarInstancias,
   listarOpcoes,
   listarPastas,
@@ -367,16 +369,16 @@ export function ExportarWorkflows() {
   // Escolhidos na lista; sem nenhum, o botao baixa tudo o que o filtro mostra.
   const baixaTudo = escolhidos.length === 0
   const alvo = baixaTudo ? visiveis : escolhidos
-  const totalZips = Math.ceil(alvo.length / LIMITE_ZIP)
 
   /**
-   * Baixa a lista de exportação (ou, sem nada escolhido, tudo o que o resultado mostra) em ZIPs de até LIMITE_ZIP
-   * workflows. A ordem é a de um explorador (por pasta e nome): cada parte leva as pastas quase inteiras, e as partes
-   * juntas, extraídas na mesma pasta, formam a hierarquia completa.
+   * Divide o que vai ser baixado em ZIPs. A ordem é a de um explorador (por pasta e nome): cada parte leva as pastas
+   * quase inteiras, e as partes juntas, extraídas na mesma pasta, formam a hierarquia completa. Um ZIP fecha quando
+   * chega a LIMITE_ZIP workflows (o limite do servidor) ou quando a URL do pedido chegaria a LIMITE_CONSULTA
+   * caracteres (acima de ~8 KB o nginx responde 414).
    */
-  async function baixar() {
+  const partes = useMemo(() => {
     if (!instancia || alvo.length === 0) {
-      return
+      return [] as ItemWorkflow[][]
     }
     const ordenados = [...alvo].sort((a, b) =>
       `${caminhoTexto(a.id)}/${a.nome}`.localeCompare(`${caminhoTexto(b.id)}/${b.nome}`, 'pt-BR', {
@@ -384,9 +386,39 @@ export function ExportarWorkflows() {
         numeric: true,
       }),
     )
-    const partes: ItemWorkflow[][] = []
-    for (let i = 0; i < ordenados.length; i += LIMITE_ZIP) {
-      partes.push(ordenados.slice(i, i + LIMITE_ZIP))
+    const pastaDe = temPastas ? pastaNoZip : undefined
+    const saida: ItemWorkflow[][] = []
+    let atual: ItemWorkflow[] = []
+    for (const w of ordenados) {
+      const tentativa = [...atual, w]
+      const cheio =
+        atual.length > 0 &&
+        (tentativa.length > LIMITE_ZIP ||
+          consultaZip(
+            instancia,
+            tentativa.map((i) => i.id),
+            pastaDe,
+          ).length > LIMITE_CONSULTA)
+      if (cheio) {
+        saida.push(atual)
+        atual = [w]
+      } else {
+        atual = tentativa
+      }
+    }
+    if (atual.length > 0) {
+      saida.push(atual)
+    }
+    return saida
+    // caminhoTexto e pastaNoZip dependem só de mapaPastas e pastaPorId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alvo, instancia, temPastas, mapaPastas, pastaPorId])
+  const totalZips = partes.length
+
+  /** Baixa a lista de exportação (ou, sem nada escolhido, tudo o que o resultado mostra), um ZIP por parte. */
+  async function baixar() {
+    if (!instancia || alvo.length === 0) {
+      return
     }
 
     setErro(null)
@@ -693,7 +725,7 @@ export function ExportarWorkflows() {
                 {alvo.length > 0 && !carregandoTudo && !baixando && (
                   <span className="text-[12px] font-normal opacity-80">
                     {alvo.length} workflow{alvo.length === 1 ? '' : 's'}
-                    {totalZips > 1 ? (baixaTudo ? ` · ${totalZips} ZIPs` : ` · até ${LIMITE_ZIP} por ZIP`) : ''}
+                    {baixaTudo && totalZips > 1 ? ` · ${totalZips} ZIPs` : ''}
                   </span>
                 )}
               </Botao>
