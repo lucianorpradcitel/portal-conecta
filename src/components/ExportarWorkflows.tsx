@@ -328,12 +328,6 @@ export function ExportarWorkflows() {
     setFiltros((atual) => ({ ...atual, [campo]: valor }))
   }
 
-  function alterarComuns(valor: boolean) {
-    setErro(null)
-    setBaixado(null)
-    setFiltros((atual) => ({ ...atual, comuns: valor }))
-  }
-
   function ordenar(lista: ItemWorkflow[]) {
     return [...lista].sort((a, b) => a.nome.localeCompare(b.nome))
   }
@@ -445,7 +439,7 @@ export function ExportarWorkflows() {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
       <div className="space-y-4 px-5 py-5">
-        {/* Faixa de filtros: tudo em uma linha, sem textos soltos (as explicações ficam em "Como funcionam") */}
+        {/* Faixa de filtros: tudo em uma linha, sem textos soltos (as explicações ficam nas dicas de cada campo) */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Select
             id="instancia"
@@ -506,38 +500,11 @@ export function ExportarWorkflows() {
         </div>
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <label
-            className={`flex items-center gap-2 ${temFiltro(filtros) ? 'text-slate-700' : 'text-slate-400'}`}
-            title="Com qualquer filtro (inclusive o campo O nome contém), junta também os sub-workflows que os encontrados chamam (e os que esses chamam)"
-          >
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-              checked={filtros.comuns}
-              disabled={!instancia || !temFiltro(filtros) || ocupado}
-              onChange={(e) => alterarComuns(e.target.checked)}
-            />
-            Incluir os workflows comuns
-            <span className="text-[13px] text-slate-400">(sub-workflows que eles chamam)</span>
-          </label>
-
           <button type="button" className={CLASSE_ACAO_TEXTO} disabled={!filtrosAtivos || ocupado} onClick={limparFiltros}>
             Limpar filtros
           </button>
 
           {instancia && carregandoPastas && <span className="text-[13px] text-slate-400">Carregando as pastas do n8n…</span>}
-
-          <details className="text-[13px] text-slate-500 sm:ml-auto">
-            <summary className="cursor-pointer select-none font-medium text-slate-600 hover:text-slate-900">
-              Como funcionam os filtros
-            </summary>
-            <p className="mt-2 max-w-2xl leading-relaxed">
-              Nesta instância os nomes seguem <code>{rotulos.padrao}</code>: em <code>LAB_Mercos_Pedido_Captura</code>,{' '}
-              <code>LAB</code> é o filtro “{rotulos.primeiro}” e <code>Mercos</code> é “{rotulos.segundo}”. A etiqueta
-              (tag) do workflow também vale nesses dois filtros. Os filtros se combinam, e sem nenhum a instância é
-              listada inteira. Workflows arquivados não entram.
-            </p>
-          </details>
         </div>
 
         {instancia && erroPastas && (
