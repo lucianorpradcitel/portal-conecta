@@ -38,7 +38,7 @@ export function Alerta({ tom, titulo, children }: { tom: Tom; titulo?: string; c
       <span className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${e.icone}`}>
         <Icone />
       </span>
-      <div className="min-w-0 text-sm leading-relaxed">
+      <div className="min-w-0 break-words text-sm leading-relaxed [overflow-wrap:anywhere]">
         {titulo && <p className={`font-semibold ${e.titulo}`}>{titulo}</p>}
         {children && <div className={`${titulo ? 'mt-0.5' : ''} ${e.texto}`}>{children}</div>}
       </div>
