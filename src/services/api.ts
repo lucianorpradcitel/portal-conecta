@@ -215,8 +215,14 @@ export function apiPost<T>(caminho: string, corpo: unknown): Promise<T> {
   })
 }
 
-/** Atualização parcial: o corpo leva só o que muda, e o que ficar de fora o servidor preserva. */
-export function apiPatch<T>(caminho: string, corpo: unknown): Promise<T> {
+/**
+ * Atualização parcial: o corpo leva só o que muda, e o que ficar de fora o servidor preserva. Sem
+ * corpo, é um PATCH que só dispara a ação (ex.: reprocessar um pedido).
+ */
+export function apiPatch<T>(caminho: string, corpo?: unknown): Promise<T> {
+  if (corpo === undefined) {
+    return requisitar<T>(caminho, { method: 'PATCH' })
+  }
   return requisitar<T>(caminho, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

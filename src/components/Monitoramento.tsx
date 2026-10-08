@@ -31,9 +31,9 @@ type SubAba = 'pedidos' | 'produtos' | 'filas'
 const INTERVALO_ATUALIZACAO_MS = 10_000
 
 /** Remove acentos e caixa, para a busca achar "integracao" em "Integração". */
-function normalizar(texto: string): string {
+function normalizar(texto?: string | null): string {
   // NFD separa a letra do acento; \p{M} casa os acentos soltos.
-  return texto.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+  return (texto ?? '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
 }
 
 function formatarDataHora(valor: string): { data: string; hora: string } | null {
@@ -73,12 +73,16 @@ interface Filtros {
 const FILTROS_VAZIOS: Filtros = { codigo: '', cliente: '', plataforma: '', erro: '' }
 
 interface ItemFiltravel {
-  cliente: string
+  cliente?: string | null
   plataforma?: string | null
   erro?: string | null
 }
 
-function filtrar<T extends ItemFiltravel>(itens: T[], filtros: Filtros, codigoDe: (item: T) => string): T[] {
+function filtrar<T extends ItemFiltravel>(
+  itens: T[],
+  filtros: Filtros,
+  codigoDe: (item: T) => string | null | undefined,
+): T[] {
   const codigo = normalizar(filtros.codigo)
   const erro = normalizar(filtros.erro)
   return itens.filter(
@@ -90,9 +94,9 @@ function filtrar<T extends ItemFiltravel>(itens: T[], filtros: Filtros, codigoDe
   )
 }
 
-const chaveProduto = (p: ProdutoComErro) => p.id ?? `${p.cliente}|${p.codigoProduto}`
+const chaveProduto = (p: ProdutoComErro) => p.id ?? `${p.cliente ?? ''}|${p.codigoProduto ?? ''}`
 // O codigoPedido se repete entre clientes (ex.: TRY_001_001_1745 em dois lojistas da Tray), então não serve de chave sozinho.
-const chavePedido = (p: PedidoComErro) => `${p.cliente}|${p.plataforma ?? ''}|${p.codigoPedido}`
+const chavePedido = (p: PedidoComErro) => `${p.cliente ?? ''}|${p.plataforma ?? ''}|${p.codigoPedido}`
 
 /**
  * Monitoramento das integrações: pedidos e produtos que falharam, atualizados a cada 10s, e as filas
@@ -171,8 +175,10 @@ export function Monitoramento() {
 
   const dadosDaAba: ItemFiltravel[] = subAba === 'produtos' ? produtos : pedidos
 
+  // Linha sem cliente (já houve produto assim na produção) não vira opção do filtro: sem nome, não há o
+  // que escolher. O .toUpperCase() abaixo derrubava a tela inteira com um nulo aqui.
   const clientes = useMemo(
-    () => Array.from(new Set(dadosDaAba.map((i) => i.cliente))).sort(),
+    () => Array.from(new Set(dadosDaAba.map((i) => i.cliente).filter((c): c is string => !!c))).sort(),
     [dadosDaAba],
   )
   const plataformas = useMemo(
@@ -224,6 +230,7 @@ export function Monitoramento() {
     { rotulo: 'Cliente' },
     { rotulo: 'Plataforma' },
     ...(ehPedidos ? [{ rotulo: 'Pedido' }] : [{ rotulo: 'Data e hora' }, { rotulo: 'Produto' }]),
+    { rotulo: ehPedidos ? 'Processamentos' : 'Tentativas' },
     { rotulo: 'Erro', className: 'w-full' },
     { rotulo: 'Rotina' },
   ]
@@ -440,6 +447,7 @@ export function Monitoramento() {
                     <Celula className="whitespace-nowrap">
                       <Codigo>{p.codigoPedido}</Codigo>
                     </Celula>
+                    <CelulaContagem valor={p.sequencialProcessamento} />
                     <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                     <CelulaRotina texto={p.rotina?.toUpperCase() || 'Não Informado'} vazia={!p.rotina} />
                   </Linha>
@@ -463,8 +471,9 @@ export function Monitoramento() {
                         )}
                       </Celula>
                       <Celula className="whitespace-nowrap">
-                        <Codigo>{p.codigoProduto}</Codigo>
+                        <Codigo>{p.codigoProduto || '—'}</Codigo>
                       </Celula>
+                      <CelulaContagem valor={p.tentativa} />
                       <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                       <CelulaRotina texto={p.rotina?.toUpperCase() || 'N/A'} vazia={!p.rotina} />
                     </Linha>
@@ -536,6 +545,15 @@ function CelulaCliente({ nome }: { nome?: string | null }) {
   return (
     <Celula primeira className="whitespace-nowrap font-medium text-slate-900">
       {nome ? nome.toUpperCase() : <span className="font-normal text-slate-400">N/A</span>}
+    </Celula>
+  )
+}
+
+/** Quantas vezes o item foi processado: o número como a API manda, sem conta. Alinhado ao centro, em colunas. */
+function CelulaContagem({ valor }: { valor?: number | null }) {
+  return (
+    <Celula className="whitespace-nowrap text-center tabular-nums text-slate-600">
+      {typeof valor === 'number' ? valor.toLocaleString('pt-BR') : <span className="text-slate-300">—</span>}
     </Celula>
   )
 }

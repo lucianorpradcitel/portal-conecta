@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { mockWorkflows } from './vite-mock-wf'
 
 // Os proxies de /api, /acesso, /filas-integracao e /wf existem só em desenvolvimento, para não esbarrar em CORS.
 // Em produção quem faz esse papel são os locations do nginx.conf.
@@ -9,7 +10,8 @@ export default defineConfig(({ mode }) => {
   const n8n = env.VITE_N8N_TARGET || 'https://automakerdev.citelsoftware.com.br'
 
   return {
-    plugins: [react()],
+    // VITE_MOCK_WF=1 simula /acesso e /wf (aba Workflows) sem n8n; ver vite-mock-wf.ts.
+    plugins: [react(), mockWorkflows(env.VITE_MOCK_WF === '1')],
     server: {
       port: 4200,
       proxy: {
