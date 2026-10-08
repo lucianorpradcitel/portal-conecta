@@ -205,6 +205,7 @@ export function Monitoramento() {
     { rotulo: 'Cliente' },
     { rotulo: 'Plataforma' },
     ...(ehPedidos ? [{ rotulo: 'Pedido' }] : [{ rotulo: 'Data e hora' }, { rotulo: 'Produto' }]),
+    { rotulo: ehPedidos ? 'Processamentos' : 'Tentativas' },
     { rotulo: 'Erro', className: 'w-full' },
     { rotulo: 'Rotina' },
   ]
@@ -374,6 +375,7 @@ export function Monitoramento() {
                     <Celula className="whitespace-nowrap">
                       <Codigo>{p.codigoPedido}</Codigo>
                     </Celula>
+                    <CelulaContagem valor={p.sequencialProcessamento} />
                     <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                     <CelulaRotina texto={p.rotina?.toUpperCase() || 'Não Informado'} vazia={!p.rotina} />
                   </Linha>
@@ -399,6 +401,7 @@ export function Monitoramento() {
                       <Celula className="whitespace-nowrap">
                         <Codigo>{p.codigoProduto || '—'}</Codigo>
                       </Celula>
+                      <CelulaContagem valor={p.tentativa} />
                       <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                       <CelulaRotina texto={p.rotina?.toUpperCase() || 'N/A'} vazia={!p.rotina} />
                     </Linha>
@@ -460,6 +463,15 @@ function CelulaCliente({ nome }: { nome?: string | null }) {
   return (
     <Celula primeira className="whitespace-nowrap font-medium text-slate-900">
       {nome ? nome.toUpperCase() : <span className="font-normal text-slate-400">N/A</span>}
+    </Celula>
+  )
+}
+
+/** Quantas vezes o item foi processado: o número como a API manda, sem conta. Alinhado ao centro, em colunas. */
+function CelulaContagem({ valor }: { valor?: number | null }) {
+  return (
+    <Celula className="whitespace-nowrap text-center tabular-nums text-slate-600">
+      {typeof valor === 'number' ? valor.toLocaleString('pt-BR') : <span className="text-slate-300">—</span>}
     </Celula>
   )
 }

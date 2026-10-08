@@ -8,6 +8,8 @@ export interface PedidoComErro {
   plataforma?: string | null
   rotina?: string | null
   status: number
+  /** PEN_SEQPRC: começa em 0 e sobe 1 a cada vez que o pedido é reenviado ao Monint. */
+  sequencialProcessamento?: number
 }
 
 /** Item do GET /pedidos?cliente= — todos os pedidos de um lojista, em qualquer status. */
@@ -39,4 +41,6 @@ export interface ProdutoComErro {
   /** Cópia de mensagemErro, preenchida na tela para o filtro tratar pedido e produto igual. */
   erro?: string | null
   rotina?: string | null
+  /** PRO_TENTAT: começa em 1 na primeira falha e sobe 1 a cada nova. */
+  tentativa?: number
 }
