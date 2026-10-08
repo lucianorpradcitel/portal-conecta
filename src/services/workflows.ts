@@ -102,8 +102,11 @@ export interface Previa {
   workflows: ItemWorkflow[]
 }
 
-/** O webhook aceita no máximo isto por exportação (um ZIP). A lista de resultado mostra a instância toda. */
-export const LIMITE_LISTA = 300
+/** O webhook aceita no máximo isto por ZIP; listas maiores são baixadas em vários ZIPs, um pedido para cada. */
+export const LIMITE_ZIP = 300
+
+/** Teto de workflows na lista de exportação (o n8n também devolve no máximo isto por consulta). */
+export const LIMITE_LISTA = 5000
 
 export const SEM_FILTROS: Filtros = { cliente: '', base: '', busca: '', comuns: true }
 

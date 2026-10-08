@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { ApiError } from '../services/api'
 import {
   LIMITE_LISTA,
+  LIMITE_ZIP,
   ROTULOS_PADRAO,
   SEM_FILTROS,
   baixarZip,
@@ -295,7 +296,6 @@ export function ExportarWorkflows() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [escolhidos, mapaPastas, pastaPorId],
   )
-  const aAdicionar = visiveis.filter((w) => !idsEscolhidos.has(w.id))
   // Largura dos dois painéis: o usuário arrasta a barra entre eles (lembrada neste navegador).
   const gradeRef = useRef<HTMLDivElement>(null)
   const [fracaoEsq, setFracaoEsq] = useState(() => lerPreferencia(CHAVE_FRACAO, FRACAO_PADRAO, 0.2, 0.85))
@@ -370,47 +370,29 @@ export function ExportarWorkflows() {
     URL.revokeObjectURL(url)
   }
 
-  async function baixar() {
-    if (!instancia || escolhidos.length === 0) {
-      return
-    }
-    setErro(null)
-    setBaixado(null)
-    setBaixando(true)
-    try {
-      const { blob, nomeArquivo } = await baixarZip(
-        instancia,
-        escolhidos.map((w) => w.id),
-        temPastas ? pastaNoZip : undefined,
-      )
-      const nome = nomeArquivo ?? `workflows_${instancia}.zip`
-      salvarArquivo(blob, nome)
-      setBaixado(nome)
-    } catch (e) {
-      setErro(mensagemDe(e, 'Não foi possível gerar o ZIP.'))
-    } finally {
-      setBaixando(false)
-    }
-  }
+  // Escolhidos na lista; sem nenhum, o botao baixa tudo o que o filtro mostra.
+  const baixaTudo = escolhidos.length === 0
+  const alvo = baixaTudo ? visiveis : escolhidos
+  const totalZips = Math.ceil(alvo.length / LIMITE_ZIP)
 
   /**
-   * Baixa tudo o que o resultado do filtro mostra, em vários ZIPs de até LIMITE_LISTA workflows cada. A ordem é a de
-   * um explorador (por pasta e nome), então cada parte leva as pastas quase inteiras, e as partes juntas, extraídas
-   * na mesma pasta, formam a hierarquia completa.
+   * Baixa a lista de exportação (ou, sem nada escolhido, tudo o que o resultado mostra) em ZIPs de até LIMITE_ZIP
+   * workflows. A ordem é a de um explorador (por pasta e nome): cada parte leva as pastas quase inteiras, e as partes
+   * juntas, extraídas na mesma pasta, formam a hierarquia completa.
    */
-  async function baixarTudo() {
-    if (!instancia || visiveis.length === 0) {
+  async function baixar() {
+    if (!instancia || alvo.length === 0) {
       return
     }
-    const ordenados = [...visiveis].sort((a, b) =>
+    const ordenados = [...alvo].sort((a, b) =>
       `${caminhoTexto(a.id)}/${a.nome}`.localeCompare(`${caminhoTexto(b.id)}/${b.nome}`, 'pt-BR', {
         sensitivity: 'base',
         numeric: true,
       }),
     )
     const partes: ItemWorkflow[][] = []
-    for (let i = 0; i < ordenados.length; i += LIMITE_LISTA) {
-      partes.push(ordenados.slice(i, i + LIMITE_LISTA))
+    for (let i = 0; i < ordenados.length; i += LIMITE_ZIP) {
+      partes.push(ordenados.slice(i, i + LIMITE_ZIP))
     }
 
     setErro(null)
@@ -606,19 +588,6 @@ export function ExportarWorkflows() {
                     ))}
                   </div>
                 )}
-                <button
-                  type="button"
-                  className={CLASSE_ACAO_TEXTO}
-                  disabled={carregandoTudo || aAdicionar.length === 0 || cheia || baixando}
-                  onClick={() => adicionar(aAdicionar)}
-                >
-                  Adicionar todos
-                  {!carregandoTudo && aAdicionar.length > 0
-                    ? aAdicionar.length > vagas
-                      ? ` (${vagas} de ${aAdicionar.length})`
-                      : ` (${aAdicionar.length})`
-                    : ''}
-                </button>
               </div>
             }
           >
@@ -649,7 +618,11 @@ export function ExportarWorkflows() {
                     aoAdicionar={adicionar}
                   />
                 )}
-                {resultado?.avisos && resultado.avisos.dinamicos + resultado.avisos.naoResolvidos > 0 && (
+                {/* Só importa quando os comuns são buscados (há filtro): sem filtro a lista já é a instância inteira. */}
+                {resultado?.avisos &&
+                  temFiltro(filtros) &&
+                  filtros.comuns &&
+                  resultado.avisos.dinamicos + resultado.avisos.naoResolvidos > 0 && (
                   <p
                     className="shrink-0 border-t border-slate-100 px-4 py-1.5 text-[13px] text-amber-700"
                     title={resultado.avisos.exemplos.join('\n')}
@@ -696,7 +669,7 @@ export function ExportarWorkflows() {
           >
             <div className="min-h-0 flex-1 overflow-y-auto">
               {escolhidos.length === 0 ? (
-                <Vazio>Adicione workflows pelo resultado ao lado. A lista se mantém ao trocar de filtro.</Vazio>
+                <Vazio>Adicione workflows pelo resultado ao lado, ou deixe a lista vazia para baixar tudo o que o filtro mostra. A lista se mantém ao trocar de filtro.</Vazio>
               ) : (
                 <ul className="divide-y divide-slate-100 text-sm text-slate-600">
                   {escolhidosOrdenados.map((w) => (
@@ -720,8 +693,7 @@ export function ExportarWorkflows() {
             <div className="shrink-0 space-y-2 border-t border-slate-100 bg-slate-50/50 p-3">
               {cheia && (
                 <p className="text-[13px] text-amber-700">
-                  A lista chegou ao limite de {LIMITE_LISTA} workflows por ZIP. Baixe este e monte outro para o restante,
-                  ou use “Baixar tudo do resultado”, que divide em vários ZIPs.
+                  A lista chegou ao limite de {LIMITE_LISTA} workflows. Baixe estes e monte outra lista para o restante.
                 </p>
               )}
               {baixado && (
@@ -729,26 +701,34 @@ export function ExportarWorkflows() {
                   {baixado}
                 </Alerta>
               )}
-              <Botao type="button" className="w-full" onClick={baixar} disabled={escolhidos.length === 0 || baixando}>
-                {baixando
-                  ? progresso
-                    ? `Gerando parte ${progresso.parte} de ${progresso.de}…`
-                    : 'Gerando ZIP…'
-                  : `Baixar ZIP${escolhidos.length > 0 ? ` (${escolhidos.length})` : ''}`}
-              </Botao>
               <Botao
                 type="button"
-                variante="secundario"
-                className="w-full"
-                onClick={baixarTudo}
-                disabled={carregandoTudo || visiveis.length === 0 || baixando}
-                title="Baixa todos os workflows do resultado do filtro, sem precisar adicioná-los à lista, em ZIPs de até 300 cada"
+                className="w-full !h-auto min-h-10 flex-col !gap-0 py-1.5"
+                onClick={baixar}
+                disabled={carregandoTudo || alvo.length === 0 || baixando}
+                title={
+                  baixaTudo
+                    ? 'Nada foi escolhido na lista: baixa tudo o que o resultado do filtro mostra'
+                    : 'Baixa os workflows da lista'
+                }
               >
-                {visiveis.length === 0 || carregandoTudo
-                  ? 'Baixar tudo do resultado'
-                  : `Baixar tudo do resultado (${visiveis.length}${
-                      visiveis.length > LIMITE_LISTA ? `, ${Math.ceil(visiveis.length / LIMITE_LISTA)} ZIPs` : ''
-                    })`}
+                <span>
+                  {baixando
+                    ? progresso && progresso.de > 1
+                      ? `Gerando parte ${progresso.parte} de ${progresso.de}…`
+                      : 'Gerando ZIP…'
+                    : baixaTudo
+                      ? 'Baixar tudo do resultado'
+                      : totalZips > 1
+                        ? `Baixar ${totalZips} ZIPs`
+                        : 'Baixar ZIP'}
+                </span>
+                {alvo.length > 0 && !carregandoTudo && !baixando && (
+                  <span className="text-[12px] font-normal opacity-80">
+                    {alvo.length} workflow{alvo.length === 1 ? '' : 's'}
+                    {totalZips > 1 ? (baixaTudo ? ` · ${totalZips} ZIPs` : ` · até ${LIMITE_ZIP} por ZIP`) : ''}
+                  </span>
+                )}
               </Botao>
               <p className="text-[12px] leading-snug text-slate-500">
                 <strong className="font-semibold text-amber-700">Cuidado:</strong> os JSONs podem conter senhas e tokens em

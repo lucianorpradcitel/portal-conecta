@@ -296,15 +296,16 @@ export function ExploradorWorkflows({
           type="button"
           disabled={desabilitado || faltamAqui.length === 0}
           onClick={() => aoAdicionar(aqui)}
-          title={idAtual === RAIZ ? 'Adicionar todos os workflows do resultado' : 'Adicionar tudo o que está nesta pasta e nas de dentro'}
+          title={
+            faltamAqui.length === 0
+              ? 'Tudo deste diretório já está na lista'
+              : `Adiciona os ${faltamAqui.length} workflows deste diretório e dos de dentro${
+                  faltamAqui.length > vagas ? ` (só cabem ${vagas} na lista de exportação)` : ''
+                }`
+          }
           className="shrink-0 rounded-md border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
         >
-          Adicionar tudo aqui
-          {faltamAqui.length > 0
-            ? faltamAqui.length > vagas
-              ? ` (${vagas} de ${faltamAqui.length})`
-              : ` (${faltamAqui.length})`
-            : ''}
+          Adicionar tudo deste diretório
         </button>
       </div>
 
@@ -327,8 +328,9 @@ export function ExploradorWorkflows({
                 <span className="h-4 w-4 shrink-0" aria-hidden="true">
                   <IconeCasa />
                 </span>
-                <span className="truncate font-medium">Todas as pastas</span>
-                <span className="ml-auto pl-1 text-[11px] text-slate-400">{itens.length}</span>
+                <span className="truncate font-medium">
+                  {itens.length} {itens.length === 1 ? 'arquivo' : 'arquivos'}
+                </span>
               </button>
               {raiz.pastas.length > 0 && <ul role="group">{raiz.pastas.map((p) => renderNavegacao(p, 1))}</ul>}
             </li>
@@ -383,11 +385,15 @@ export function ExploradorWorkflows({
                         type="button"
                         disabled={desabilitado || faltam.length === 0}
                         onClick={() => aoAdicionar(todos)}
-                        title={`Adicionar todos os workflows de ${no.nome} (${todos.length})`}
-                        aria-label={`Adicionar todos os workflows da pasta ${no.nome}`}
-                        className={CLASSE_ACAO}
+                        title={faltam.length === 0 ? 'A pasta toda já está na lista' : 'Adicionar pasta toda'}
+                        aria-label={
+                          faltam.length === 0
+                            ? `Todos os workflows da pasta ${no.nome} já estão na lista`
+                            : `Adicionar pasta toda: ${no.nome} (${faltam.length} workflows)`
+                        }
+                        className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
                       >
-                        pasta toda
+                        {faltam.length === 0 ? <IconeCheck /> : <IconeMais />}
                       </button>
                     </li>
                   )
