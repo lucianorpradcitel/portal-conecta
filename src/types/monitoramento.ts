@@ -14,6 +14,8 @@ export interface PedidoComErro {
 
 /** Item do GET /pedidos?cliente= — todos os pedidos de um lojista, em qualquer status. */
 export interface PedidoDoCliente {
+  /** PEN_IDPED_: identifica a linha. O codigoPedido se repete entre lojistas. */
+  id: string
   codigoPedido: string
   cliente: string
   /** Mensagem do último processamento. Nos finalizados costuma vir "FINALIZADO". */

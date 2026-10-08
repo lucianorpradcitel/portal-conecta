@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ApiError, apiGet } from '../services/api'
+import { ApiError, apiGet, ehAdmin } from '../services/api'
 import type { PedidoDoCliente } from '../types/monitoramento'
+import { ModalReprocessarPedido } from './ModalReprocessarPedido'
 import { Alerta } from './ui/Alerta'
-import { IconeCaixa, IconeLupa, IconeVoltar } from './ui/Icones'
+import { IconeCaixa, IconeLupa, IconeReciclar, IconeVoltar } from './ui/Icones'
 import {
   BotaoAtualizar,
   BotaoLimpar,
@@ -77,6 +78,13 @@ export function PedidosDoCliente({ nomeCliente, codigoCliente, aoVoltar }: Props
   const [plataforma, setPlataforma] = useState('')
   const [pagina, setPagina] = useState(1)
 
+  /** Pedido cujo popup de reprocessamento está aberto. */
+  const [emReprocesso, setEmReprocesso] = useState<PedidoDoCliente | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  // O botão só existe para admin; a API responde 403 a quem tentar por fora e 409 se não houver erro.
+  const admin = ehAdmin()
+
   const carregar = useCallback(() => {
     setCarregando(true)
     setErro(null)
@@ -125,6 +133,21 @@ export function PedidosDoCliente({ nomeCliente, codigoCliente, aoVoltar }: Props
   const paginaAtual = Math.min(pagina, totalPaginas)
   const visiveis = filtrados.slice((paginaAtual - 1) * POR_PAGINA, paginaAtual * POR_PAGINA)
   const temFiltro = status !== null || Boolean(busca || plataforma)
+
+  // O aviso de sucesso some sozinho.
+  useEffect(() => {
+    if (!aviso) {
+      return
+    }
+    const temporizador = setTimeout(() => setAviso(null), 8000)
+    return () => clearTimeout(temporizador)
+  }, [aviso])
+
+  function aoReprocessar(pedido: PedidoDoCliente) {
+    setEmReprocesso(null)
+    setAviso(`Pedido ${pedido.codigoPedido} voltou para a fila (status 0). O n8n vai processá-lo de novo.`)
+    carregar()
+  }
 
   function limpar() {
     setStatus(null)
@@ -253,96 +276,134 @@ export function PedidosDoCliente({ nomeCliente, codigoCliente, aoVoltar }: Props
           ) : undefined
         }
       >
-        {erro ? (
-          <div className="p-5">
-            <Alerta tom="erro" titulo="Não foi possível carregar">
-              {erro}
-            </Alerta>
-          </div>
-        ) : carregando && pedidos.length === 0 ? (
-          <Carregando texto="Carregando pedidos…" />
-        ) : pedidos.length === 0 ? (
-          <EstadoVazio
-            icone={<IconeCaixa />}
-            titulo="Nenhum pedido encontrado"
-            texto={`Não há pedidos gravados com o nome "${nomeCliente}". Se os pedidos deste lojista usam outro nome (ex.: com sufixo de filial), eles não aparecem aqui.`}
-          />
-        ) : filtrados.length === 0 ? (
-          <EstadoVazio
-            icone={<IconeLupa />}
-            texto="Nenhum pedido corresponde aos filtros."
-            acao={
-              <button
-                type="button"
-                onClick={limpar}
-                className="text-sm font-medium text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline"
-              >
-                Limpar filtros
-              </button>
-            }
-          />
-        ) : (
-          <Tabela
-            colunas={[
-              { rotulo: 'Pedido' },
-              { rotulo: 'Plataforma' },
-              { rotulo: 'Status' },
-              { rotulo: 'Mensagem', className: 'w-full' },
-              { rotulo: 'Processamentos' },
-              { rotulo: 'Última alteração' },
-            ]}
-          >
-            {visiveis.map((p) => {
-              const s = infoStatus(p.status)
-              const quando = formatarDataHora(p.ultimaAlteracao)
-              // Nos finalizados a mensagem só repete o status; não vale a coluna.
-              const mensagem = p.erro && p.erro.toUpperCase() !== 'FINALIZADO' ? p.erro : null
-              return (
-                <Linha key={`${p.codigoPedido}|${p.plataforma ?? ''}`}>
-                  <Celula primeira className="whitespace-nowrap">
-                    <Codigo>{p.codigoPedido}</Codigo>
-                  </Celula>
-                  <Celula className="whitespace-nowrap">
-                    <EtiquetaPlataforma nome={p.plataforma} />
-                  </Celula>
-                  <Celula className="whitespace-nowrap">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${s.etiqueta}`}
-                    >
-                      <span className={`h-1.5 w-1.5 rounded-full ${s.ponto}`} />
-                      {s.codigo} - {s.rotulo}
-                    </span>
-                  </Celula>
-                  <Celula className="min-w-[16rem]">
-                    {mensagem ? (
-                      <p
-                        className={`line-clamp-2 break-words leading-relaxed ${p.status === 2 ? 'text-red-700' : 'text-slate-600'}`}
-                        title={mensagem}
+        <>
+          {aviso && (
+            <div className="px-5 pt-4">
+              <Alerta tom="sucesso" titulo="Pedido reprocessado">
+                {aviso}
+              </Alerta>
+            </div>
+          )}
+          {erro ? (
+            <div className="p-5">
+              <Alerta tom="erro" titulo="Não foi possível carregar">
+                {erro}
+              </Alerta>
+            </div>
+          ) : carregando && pedidos.length === 0 ? (
+            <Carregando texto="Carregando pedidos…" />
+          ) : pedidos.length === 0 ? (
+            <EstadoVazio
+              icone={<IconeCaixa />}
+              titulo="Nenhum pedido encontrado"
+              texto={`Não há pedidos gravados com o nome "${nomeCliente}". Se os pedidos deste lojista usam outro nome (ex.: com sufixo de filial), eles não aparecem aqui.`}
+            />
+          ) : filtrados.length === 0 ? (
+            <EstadoVazio
+              icone={<IconeLupa />}
+              texto="Nenhum pedido corresponde aos filtros."
+              acao={
+                <button
+                  type="button"
+                  onClick={limpar}
+                  className="text-sm font-medium text-brand-700 underline-offset-4 hover:text-brand-800 hover:underline"
+                >
+                  Limpar filtros
+                </button>
+              }
+            />
+          ) : (
+            <Tabela
+              colunas={[
+                { rotulo: 'Pedido' },
+                { rotulo: 'Plataforma' },
+                { rotulo: 'Status' },
+                { rotulo: 'Mensagem', className: 'w-full' },
+                { rotulo: 'Processamentos' },
+                { rotulo: 'Última alteração' },
+                ...(admin ? [{ rotulo: 'Ações' }] : []),
+              ]}
+            >
+              {visiveis.map((p) => {
+                const s = infoStatus(p.status)
+                const quando = formatarDataHora(p.ultimaAlteracao)
+                // Nos finalizados a mensagem só repete o status; não vale a coluna.
+                const mensagem = p.erro && p.erro.toUpperCase() !== 'FINALIZADO' ? p.erro : null
+                return (
+                  <Linha key={p.id ?? `${p.codigoPedido}|${p.plataforma ?? ''}`}>
+                    <Celula primeira className="whitespace-nowrap">
+                      <Codigo>{p.codigoPedido}</Codigo>
+                    </Celula>
+                    <Celula className="whitespace-nowrap">
+                      <EtiquetaPlataforma nome={p.plataforma} />
+                    </Celula>
+                    <Celula className="whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${s.etiqueta}`}
                       >
-                        {mensagem}
-                      </p>
-                    ) : (
-                      <span className="text-slate-300">—</span>
+                        <span className={`h-1.5 w-1.5 rounded-full ${s.ponto}`} />
+                        {s.codigo} - {s.rotulo}
+                      </span>
+                    </Celula>
+                    <Celula className="min-w-[16rem]">
+                      {mensagem ? (
+                        <p
+                          className={`line-clamp-2 break-words leading-relaxed ${p.status === 2 ? 'text-red-700' : 'text-slate-600'}`}
+                          title={mensagem}
+                        >
+                          {mensagem}
+                        </p>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
+                    </Celula>
+                    <Celula className="whitespace-nowrap text-center tabular-nums text-slate-600">
+                      {p.sequencialProcessamento ?? '—'}
+                    </Celula>
+                    <Celula ultima={!admin} className="whitespace-nowrap tabular-nums">
+                      {quando ? (
+                        <>
+                          <div className="text-slate-700">{quando.data}</div>
+                          <div className="text-xs text-slate-400">{quando.hora}</div>
+                        </>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </Celula>
+                    {admin && (
+                      <Celula ultima className="whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => setEmReprocesso(p)}
+                          disabled={p.status !== 2}
+                          title={
+                            p.status === 2
+                              ? `Reprocessar o pedido ${p.codigoPedido}`
+                              : 'Só pedidos com erro podem ser reprocessados'
+                          }
+                          aria-label={`Reprocessar o pedido ${p.codigoPedido}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25 active:scale-95 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent disabled:hover:text-slate-300 disabled:active:scale-100"
+                        >
+                          <span className="h-4 w-4">
+                            <IconeReciclar />
+                          </span>
+                        </button>
+                      </Celula>
                     )}
-                  </Celula>
-                  <Celula className="whitespace-nowrap text-center tabular-nums text-slate-600">
-                    {p.sequencialProcessamento ?? '—'}
-                  </Celula>
-                  <Celula ultima className="whitespace-nowrap tabular-nums">
-                    {quando ? (
-                      <>
-                        <div className="text-slate-700">{quando.data}</div>
-                        <div className="text-xs text-slate-400">{quando.hora}</div>
-                      </>
-                    ) : (
-                      <span className="text-slate-400">—</span>
-                    )}
-                  </Celula>
-                </Linha>
-              )
-            })}
-          </Tabela>
-        )}
+                  </Linha>
+                )
+              })}
+            </Tabela>
+          )}
+          {emReprocesso && (
+            <ModalReprocessarPedido
+              pedido={emReprocesso}
+              nomeCliente={nomeCliente}
+              aoFechar={() => setEmReprocesso(null)}
+              aoReprocessar={aoReprocessar}
+            />
+          )}
+        </>
       </CartaoConsulta>
     </div>
   )
