@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ApiError } from '../services/api'
 import {
+  LIMITE_CONSULTA,
   LIMITE_LISTA,
   LIMITE_ZIP,
   ROTULOS_PADRAO,
   SEM_FILTROS,
   baixarZip,
+  consultaZip,
   listarInstancias,
   listarOpcoes,
   listarPastas,
@@ -20,11 +22,13 @@ import {
 } from '../services/workflows'
 import { ArvoreWorkflows } from './ArvoreWorkflows'
 import { ExploradorWorkflows } from './ExploradorWorkflows'
+import { dividirEmZips } from './zips'
 import { Alerta } from './ui/Alerta'
 import { Botao } from './ui/Botao'
 import { Campo } from './ui/Campo'
 import { DivisorVertical, gravarPreferencia, lerPreferencia } from './ui/DivisorVertical'
-import { IconeX } from './ui/Icones'
+import { CLASSE_MENOS } from './ui/estilosAcao'
+import { IconeMenos } from './ui/Icones'
 import { Select } from './ui/Select'
 
 /** Espera o usuário parar de digitar antes de consultar a prévia. */
@@ -80,7 +84,7 @@ function BotaoLinha({
       title={rotulo}
       onClick={aoClicar}
       disabled={desabilitado}
-      className="h-6 w-6 shrink-0 rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:cursor-not-allowed disabled:text-emerald-500 disabled:hover:bg-transparent"
+      className={CLASSE_MENOS}
     >
       {children}
     </button>
@@ -346,6 +350,12 @@ export function ExportarWorkflows() {
     setEscolhidos((atual) => atual.filter((w) => w.id !== id))
   }
 
+  function removerVarios(itens: ItemWorkflow[]) {
+    const ids = new Set(itens.map((w) => w.id))
+    setBaixado(null)
+    setEscolhidos((atual) => atual.filter((w) => !ids.has(w.id)))
+  }
+
   // O ZIP repete as pastas do n8n a partir da raiz, com os nomes originais (ex.: Mercos/Paulinho Motos/...), de modo
   // que extrair um ou vários ZIPs na mesma pasta remonta a mesma hierarquia. "/" dentro de um nome viraria um nível a mais.
   function pastaNoZip(id: string) {
@@ -367,26 +377,39 @@ export function ExportarWorkflows() {
   // Escolhidos na lista; sem nenhum, o botao baixa tudo o que o filtro mostra.
   const baixaTudo = escolhidos.length === 0
   const alvo = baixaTudo ? visiveis : escolhidos
-  const totalZips = Math.ceil(alvo.length / LIMITE_ZIP)
 
   /**
-   * Baixa a lista de exportação (ou, sem nada escolhido, tudo o que o resultado mostra) em ZIPs de até LIMITE_ZIP
-   * workflows. A ordem é a de um explorador (por pasta e nome): cada parte leva as pastas quase inteiras, e as partes
-   * juntas, extraídas na mesma pasta, formam a hierarquia completa.
+   * Divide o que vai ser baixado em ZIPs sem separar pastas: o que não cabe mais no ZIP atual vai inteiro para o
+   * próximo, e só uma pasta que sozinha passa do limite é dividida (ver dividirEmZips). Um ZIP está cheio com
+   * LIMITE_ZIP workflows (o limite do servidor) ou quando a URL do pedido chegaria a LIMITE_CONSULTA caracteres
+   * (acima de ~8 KB o nginx responde 414). As partes, extraídas na mesma pasta, formam a hierarquia completa.
    */
+  const partes = useMemo(() => {
+    if (!instancia || alvo.length === 0) {
+      return [] as ItemWorkflow[][]
+    }
+    const pastaDe = temPastas ? pastaNoZip : undefined
+    const caminhoDe = (id: string) => {
+      const pasta = mapaPastas?.workflows[id]
+      return pasta ? caminhoDaPasta(pasta) : []
+    }
+    const cabe = (lista: ItemWorkflow[]) =>
+      lista.length <= LIMITE_ZIP &&
+      consultaZip(
+        instancia,
+        lista.map((i) => i.id),
+        pastaDe,
+      ).length <= LIMITE_CONSULTA
+    return dividirEmZips(alvo, caminhoDe, cabe)
+    // caminhoDaPasta e pastaNoZip dependem só de mapaPastas e pastaPorId
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alvo, instancia, temPastas, mapaPastas, pastaPorId])
+  const totalZips = partes.length
+
+  /** Baixa a lista de exportação (ou, sem nada escolhido, tudo o que o resultado mostra), um ZIP por parte. */
   async function baixar() {
     if (!instancia || alvo.length === 0) {
       return
-    }
-    const ordenados = [...alvo].sort((a, b) =>
-      `${caminhoTexto(a.id)}/${a.nome}`.localeCompare(`${caminhoTexto(b.id)}/${b.nome}`, 'pt-BR', {
-        sensitivity: 'base',
-        numeric: true,
-      }),
-    )
-    const partes: ItemWorkflow[][] = []
-    for (let i = 0; i < ordenados.length; i += LIMITE_ZIP) {
-      partes.push(ordenados.slice(i, i + LIMITE_ZIP))
     }
 
     setErro(null)
@@ -574,8 +597,10 @@ export function ExportarWorkflows() {
                     mapa={mapaPastas?.workflows ?? {}}
                     jaAdicionados={idsEscolhidos}
                     desabilitado={cheia || baixando}
+                    baixando={baixando}
                     vagas={vagas}
                     aoAdicionar={adicionar}
+                    aoRemover={removerVarios}
                   />
                 ) : (
                   <ArvoreWorkflows
@@ -649,7 +674,7 @@ export function ExportarWorkflows() {
                         {w.nome}
                       </span>
                       <BotaoLinha rotulo={`Remover ${w.nome}`} aoClicar={() => remover(w.id)} desabilitado={baixando}>
-                        <IconeX />
+                        <IconeMenos />
                       </BotaoLinha>
                     </li>
                   ))}
@@ -693,7 +718,7 @@ export function ExportarWorkflows() {
                 {alvo.length > 0 && !carregandoTudo && !baixando && (
                   <span className="text-[12px] font-normal opacity-80">
                     {alvo.length} workflow{alvo.length === 1 ? '' : 's'}
-                    {totalZips > 1 ? (baixaTudo ? ` · ${totalZips} ZIPs` : ` · até ${LIMITE_ZIP} por ZIP`) : ''}
+                    {baixaTudo && totalZips > 1 ? ` · ${totalZips} ZIPs` : ''}
                   </span>
                 )}
               </Botao>

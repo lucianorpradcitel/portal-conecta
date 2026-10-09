@@ -170,7 +170,18 @@ export async function listarPastas(instancia: string): Promise<MapaPastas> {
  * não crescer com o tamanho da lista.
  */
 export function baixarZip(instancia: string, ids: string[], pastaDe?: (id: string) => string | null) {
-  const params = new URLSearchParams({ acao: 'exportar', instancia, ids: ids.join(',') })
+  return apiBaixar(`?${consultaZip(instancia, ids, pastaDe)}`, BASE_WF)
+}
+
+/**
+ * Teto, em caracteres, da consulta de um pedido de ZIP. Os IDs e as pastas vão na URL, e o nginx recusa com 414
+ * uma linha de pedido acima de ~8 KB; este teto deixa folga para o caminho e o protocolo.
+ */
+export const LIMITE_CONSULTA = 6000
+
+/** A parte "acao=exportar&..." da URL do ZIP (sem o "?"). Vírgulas ficam cruas: percent-encoded gastariam 3 caracteres. */
+export function consultaZip(instancia: string, ids: string[], pastaDe?: (id: string) => string | null): string {
+  const partes = [`acao=exportar`, `instancia=${encodeURIComponent(instancia)}`, `ids=${ids.map(encodeURIComponent).join(',')}`]
   if (pastaDe) {
     const caminhos: string[] = []
     const indices = ids.map((id) => {
@@ -186,9 +197,8 @@ export function baixarZip(instancia: string, ids: string[], pastaDe?: (id: strin
       return String(k)
     })
     if (caminhos.length > 0) {
-      params.set('dirs', JSON.stringify(caminhos))
-      params.set('idx', indices.join(','))
+      partes.push(`dirs=${encodeURIComponent(JSON.stringify(caminhos))}`, `idx=${indices.join(',')}`)
     }
   }
-  return apiBaixar(`?${params.toString()}`, BASE_WF)
+  return partes.join('&')
 }
