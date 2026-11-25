@@ -4,7 +4,7 @@ import { apiGet, apiPatch } from './api'
 import { criarColeta } from './coleta'
 
 /**
- * Os tipos de erro (CADMSG), lidos do GET /tipos-erro. A lista é pequena e muda pouco, então fica toda no módulo e é
+ * Os tipos de erro (CADERR), lidos do GET /tipos-erro. A lista é pequena e muda pouco, então fica toda no módulo e é
  * relida a cada minuto: o Monitoramento cruza com ela pelo `codigoMensagem` de cada erro (para mostrar se o tipo foi
  * validado) e a página de Tipos de erro lista e valida. Qualquer usuário interno pode ler; validar é do DEV e do ADM.
  */

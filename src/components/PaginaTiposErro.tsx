@@ -47,7 +47,7 @@ const CLASSE_BOTAO_PRIMARIO = `${CLASSE_BOTAO_ACAO} bg-ink-900 text-white hover:
 const CLASSE_BOTAO_SECUNDARIO = `${CLASSE_BOTAO_ACAO} border border-slate-200 bg-surface text-slate-700 shadow-soft hover:border-slate-300 hover:bg-slate-50 disabled:text-slate-400`
 
 /**
- * Tipos de erro (CADMSG) para o DEV e o ADM conferirem. Cada tipo define a responsabilidade de todos os erros ligados a
+ * Tipos de erro (CADERR) para o DEV e o ADM conferirem. Cada tipo define a responsabilidade de todos os erros ligados a
  * ele, e quem decide de início é a IA. Aqui uma pessoa confirma ou troca a responsabilidade; a API grava
  * quem validou e quando. Trocar vale para todos os erros do tipo, de uma vez.
  */

@@ -1,4 +1,4 @@
-/** Item do GET /tipos-erro (CADMSG): o tipo do erro, que define a responsabilidade de todos os erros ligados a ele. */
+/** Item do GET /tipos-erro (CADERR): o tipo do erro, que define a responsabilidade de todos os erros ligados a ele. */
 export interface TipoErro {
   /** MSG_CODIGO: é o `codigoMensagem` que produtos e pedidos guardam. */
   codigo: number
