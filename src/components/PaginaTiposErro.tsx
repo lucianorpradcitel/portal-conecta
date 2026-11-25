@@ -43,7 +43,7 @@ function normalizar(texto?: string | null): string {
 }
 
 const CLASSE_BOTAO_ACAO =
-  'inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium transition-all duration-150 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25 disabled:cursor-not-allowed disabled:active:scale-100'
+  'inline-flex h-8 w-28 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium transition-all duration-150 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25 disabled:cursor-not-allowed disabled:active:scale-100'
 const CLASSE_BOTAO_PRIMARIO = `${CLASSE_BOTAO_ACAO} bg-ink-900 text-white hover:bg-ink-800 disabled:bg-slate-300 disabled:text-slate-500 dark:bg-brand-500 dark:text-ink-950 dark:hover:bg-brand-400 dark:disabled:bg-slate-200 dark:disabled:text-slate-400`
 const CLASSE_BOTAO_SECUNDARIO = `${CLASSE_BOTAO_ACAO} border border-slate-200 bg-surface text-slate-700 shadow-soft hover:border-slate-300 hover:bg-slate-50 disabled:text-slate-400`
 
@@ -315,7 +315,7 @@ export function PaginaTiposErro() {
                     <SeloResponsabilidade valor={tipo.status} tipo={tipo} />
                   </Celula>
                   <Celula className="whitespace-nowrap">
-                    <div className="w-44">
+                    <div className="w-40">
                       <SelectFiltro
                         aria-label={`Responsabilidade de ${tipo.codigoErro}`}
                         value={String(escolhida)}
@@ -349,10 +349,14 @@ export function PaginaTiposErro() {
                         type="button"
                         className={validado ? CLASSE_BOTAO_SECUNDARIO : CLASSE_BOTAO_PRIMARIO}
                         disabled={ocupado || escolhida === 0}
-                        title={descreverValidacao(tipo)}
+                        title={
+                          mudou
+                            ? `Muda a responsabilidade para ${ROTULO_RESPONSABILIDADE[escolhida]?.rotulo ?? escolhida}${validado ? '' : ' e valida o tipo'}, para todos os erros dele`
+                            : descreverValidacao(tipo)
+                        }
                         onClick={() => void validar(tipo)}
                       >
-                        {ocupado ? 'Salvando…' : validado ? 'Reclassificar' : mudou ? 'Reclassificar e validar' : 'Validar'}
+                        {ocupado ? 'Salvando…' : mudou ? 'Reclassificar' : 'Validar'}
                       </button>
                     )}
                   </Celula>
