@@ -13,7 +13,7 @@ export const ROTULO_RESPONSABILIDADE: Record<number, { rotulo: string; dica: str
     tracejado: 'border border-dashed border-slate-400 text-slate-600',
   },
   1: {
-    rotulo: 'Desenvolvimento',
+    rotulo: 'Dev',
     dica: 'Culpa do desenvolvimento (integração): o time precisa agir',
     classe: 'bg-red-50 text-red-700 ring-red-600/15',
     tracejado: 'border border-dashed border-red-400 bg-red-50/40 text-red-700',

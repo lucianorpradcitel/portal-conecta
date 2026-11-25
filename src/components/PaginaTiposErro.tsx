@@ -328,7 +328,7 @@ export function PaginaTiposErro() {
                     <SeloResponsabilidade valor={tipo.status} tipo={tipo} />
                   </Celula>
                   <Celula className="whitespace-nowrap">
-                    <div className="w-44">
+                    <div className="w-40">
                       <SelectFiltro
                         aria-label={`Responsabilidade de ${tipo.codigoErro}`}
                         value={String(escolhida)}
