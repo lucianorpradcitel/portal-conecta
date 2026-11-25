@@ -13,8 +13,8 @@ export const ROTULO_RESPONSABILIDADE: Record<number, { rotulo: string; dica: str
     tracejado: 'border border-dashed border-slate-400 text-slate-600',
   },
   1: {
-    rotulo: 'Nossa',
-    dica: 'Culpa nossa (integração): o time precisa agir',
+    rotulo: 'Desenvolvimento',
+    dica: 'Culpa do desenvolvimento (integração): o time precisa agir',
     classe: 'bg-red-50 text-red-700 ring-red-600/15',
     tracejado: 'border border-dashed border-red-400 bg-red-50/40 text-red-700',
   },
@@ -55,14 +55,14 @@ export interface DefinicaoVisao {
 export const VISOES: readonly DefinicaoVisao[] = [
   {
     id: 'padrao',
-    rotulo: 'Padrão',
-    dica: 'Erros nossos (1) e ainda sem classificação (0)',
+    rotulo: 'Dev',
+    dica: 'Erros do desenvolvimento (1) e ainda sem classificação (0)',
     responsabilidades: [1, 0],
     perfilMinimo: 'DEV',
   },
   {
     id: 'usuarios',
-    rotulo: 'Usuários',
+    rotulo: 'Cliente',
     dica: 'Erros do cliente (2) e da plataforma externa (4)',
     responsabilidades: [2, 4],
     perfilMinimo: 'USR',
@@ -76,7 +76,7 @@ export const VISOES: readonly DefinicaoVisao[] = [
   },
 ]
 
-/** As visões que o perfil da sessão enxerga (o USR só tem "Usuários"). */
+/** As visões que o perfil da sessão enxerga (o USR só tem "Cliente"). */
 export function visoesDoPerfil(): DefinicaoVisao[] {
   return VISOES.filter((v) => temPerfil(v.perfilMinimo))
 }

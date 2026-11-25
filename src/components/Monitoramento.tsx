@@ -201,8 +201,8 @@ export function Monitoramento() {
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_VAZIOS)
   const [consulta, setConsulta] = useState<ConsultaProdutos>(CONSULTA_PRODUTOS_INICIAL)
 
-  // O recorte por responsabilidade (Padrão, Usuários, Todos) vale para pedidos e produtos. O perfil da sessão
-  // decide quais a pessoa vê: o USR só tem "Usuários". A API barra de novo quem pedir o que não pode.
+  // O recorte por responsabilidade (Dev, Cliente, Todos) vale para pedidos e produtos. O perfil da sessão
+  // decide quais a pessoa vê: o USR só tem "Cliente". A API barra de novo quem pedir o que não pode.
   const visoes = useMemo(visoesDoPerfil, [])
   // Os tipos de erro: o selo de responsabilidade mostra, no hover, se o tipo foi validado e por quem.
   const { porCodigo: tiposPorCodigo } = useTiposErro()
@@ -865,7 +865,7 @@ function RodapePaginacao({
   )
 }
 
-/** Padrão, Usuários e Todos: o recorte dos erros por responsabilidade. Quem só tem uma visão vê só o texto dela. */
+/** Dev, Cliente e Todos: o recorte dos erros por responsabilidade. Quem só tem uma visão vê só o texto dela. */
 function SeletorVisao({
   visoes,
   atual,
