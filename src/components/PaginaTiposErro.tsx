@@ -12,6 +12,7 @@ import {
 import type { PlataformaResumo } from '../types/integracao'
 import type { TipoErro } from '../types/tiposErro'
 import { Alerta } from './ui/Alerta'
+import { SeloResponsabilidade } from './ui/SeloResponsabilidade'
 import { IconeCheck, IconeCheckCirculo, IconeEscudo } from './ui/Icones'
 import {
   BotaoAtualizar,
@@ -281,6 +282,7 @@ export function PaginaTiposErro() {
               { rotulo: 'Origem' },
               { rotulo: 'Cadastrado em' },
               { rotulo: 'Responsabilidade' },
+              { rotulo: 'Alterar para' },
               { rotulo: 'Ação' },
             ]}
           >
@@ -305,6 +307,9 @@ export function PaginaTiposErro() {
                   <Celula className="whitespace-nowrap text-slate-600">{rotuloOrigem(tipo.origem)}</Celula>
                   <Celula className="whitespace-nowrap tabular-nums text-slate-600">
                     {formatarDataHora(tipo.dataCadastro) ?? '—'}
+                  </Celula>
+                  <Celula className="whitespace-nowrap">
+                    <SeloResponsabilidade valor={tipo.status} tipo={tipo} />
                   </Celula>
                   <Celula className="whitespace-nowrap">
                     <div className="w-44">

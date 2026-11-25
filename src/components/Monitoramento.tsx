@@ -8,13 +8,12 @@ import {
 } from '../services/filas'
 import {
   adicionarResponsabilidade,
-  ROTULO_RESPONSABILIDADE,
   visaoInicial,
   visoesDoPerfil,
   type DefinicaoVisao,
   type Visao,
 } from '../services/responsabilidade'
-import { descreverValidacao, useTiposErro } from '../services/tiposErro'
+import { useTiposErro } from '../services/tiposErro'
 import { coletaWebservices } from '../services/webservices'
 import { classificarClientes } from '../types/filas'
 import type { FiltrosProdutos, PaginaProdutos, PedidoComErro, ProdutoComErro } from '../types/monitoramento'
@@ -22,6 +21,7 @@ import type { TipoErro } from '../types/tiposErro'
 import { PainelFilas } from './PainelFilas'
 import { PainelWebservices } from './PainelWebservices'
 import { CartaoResumo } from './ui/CartaoResumo'
+import { SeloResponsabilidade } from './ui/SeloResponsabilidade'
 import { IconeAlerta, IconeAtividade, IconeCaixa, IconeCheck, IconeEtiqueta, IconeLupa, IconePessoas } from './ui/Icones'
 import {
   BotaoAtualizar,
@@ -907,24 +907,11 @@ function SeletorVisao({
   )
 }
 
-/**
- * De quem é o erro. Sem o campo (API antiga) ou sem tipo, vale "A classificar". O selo é cheio quando uma pessoa
- * validou o tipo e tracejado, com um ponto, quando ainda não; o hover diz por quê (quem validou ou como nasceu).
- */
+/** De quem é o erro. Sem o campo (API antiga) ou sem tipo, vale "A classificar". */
 function CelulaResponsabilidade({ valor, tipo }: { valor?: number | null; tipo?: TipoErro }) {
-  const info = ROTULO_RESPONSABILIDADE[valor ?? 0] ?? ROTULO_RESPONSABILIDADE[0]
-  const pendente = !!tipo && tipo.validado !== 'S'
   return (
     <Celula className="whitespace-nowrap">
-      <span
-        title={tipo ? `${info.dica}\n${descreverValidacao(tipo)}` : info.dica}
-        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold ${
-          pendente ? info.tracejado : `ring-1 ring-inset ${info.classe}`
-        }`}
-      >
-        {pendente && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-        {info.rotulo}
-      </span>
+      <SeloResponsabilidade valor={valor} tipo={tipo} />
     </Celula>
   )
 }
