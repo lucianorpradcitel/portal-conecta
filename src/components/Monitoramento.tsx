@@ -14,9 +14,11 @@ import {
   type DefinicaoVisao,
   type Visao,
 } from '../services/responsabilidade'
+import { descreverValidacao, useTiposErro } from '../services/tiposErro'
 import { coletaWebservices } from '../services/webservices'
 import { classificarClientes } from '../types/filas'
 import type { FiltrosProdutos, PaginaProdutos, PedidoComErro, ProdutoComErro } from '../types/monitoramento'
+import type { TipoErro } from '../types/tiposErro'
 import { PainelFilas } from './PainelFilas'
 import { PainelWebservices } from './PainelWebservices'
 import { CartaoResumo } from './ui/CartaoResumo'
@@ -202,6 +204,9 @@ export function Monitoramento() {
   // O recorte por responsabilidade (Padrão, Usuários, Todos) vale para pedidos e produtos. O perfil da sessão
   // decide quais a pessoa vê: o USR só tem "Usuários". A API barra de novo quem pedir o que não pode.
   const visoes = useMemo(visoesDoPerfil, [])
+  // Os tipos de erro: o selo de responsabilidade mostra, no hover, se o tipo foi validado e por quem.
+  const { porCodigo: tiposPorCodigo } = useTiposErro()
+  const tipoDe = (codigo?: number | null) => (codigo == null ? undefined : tiposPorCodigo.get(codigo))
   const [visao, setVisao] = useState<Visao>(visaoInicial)
 
   // O retrato das filas vive no serviço, não aqui: ao trocar de tela e voltar, o último retrato
@@ -705,7 +710,7 @@ export function Monitoramento() {
                       <Codigo>{p.codigoPedido}</Codigo>
                     </Celula>
                     <CelulaContagem valor={p.sequencialProcessamento} />
-                    <CelulaResponsabilidade valor={p.responsabilidade} />
+                    <CelulaResponsabilidade valor={p.responsabilidade} tipo={tipoDe(p.codigoMensagem)} />
                     <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                     <CelulaRotina texto={p.rotina?.toUpperCase() || 'Não Informado'} vazia={!p.rotina} />
                   </Linha>
@@ -732,7 +737,7 @@ export function Monitoramento() {
                         <Codigo>{p.codigoProduto || '—'}</Codigo>
                       </Celula>
                       <CelulaContagem valor={p.tentativa} />
-                      <CelulaResponsabilidade valor={p.responsabilidade} />
+                      <CelulaResponsabilidade valor={p.responsabilidade} tipo={tipoDe(p.codigoMensagem)} />
                       <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                       <CelulaRotina texto={p.rotina?.toUpperCase() || 'N/A'} vazia={!p.rotina} />
                     </Linha>
@@ -902,15 +907,22 @@ function SeletorVisao({
   )
 }
 
-/** De quem é o erro. Sem o campo (API antiga) ou sem tipo, vale "A classificar". */
-function CelulaResponsabilidade({ valor }: { valor?: number | null }) {
+/**
+ * De quem é o erro. Sem o campo (API antiga) ou sem tipo, vale "A classificar". O selo é cheio quando uma pessoa
+ * validou o tipo e tracejado, com um ponto, quando ainda não; o hover diz por quê (quem validou ou como nasceu).
+ */
+function CelulaResponsabilidade({ valor, tipo }: { valor?: number | null; tipo?: TipoErro }) {
   const info = ROTULO_RESPONSABILIDADE[valor ?? 0] ?? ROTULO_RESPONSABILIDADE[0]
+  const pendente = !!tipo && tipo.validado !== 'S'
   return (
     <Celula className="whitespace-nowrap">
       <span
-        title={info.dica}
-        className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${info.classe}`}
+        title={tipo ? `${info.dica}\n${descreverValidacao(tipo)}` : info.dica}
+        className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+          pendente ? info.tracejado : `ring-1 ring-inset ${info.classe}`
+        }`}
       >
+        {pendente && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
         {info.rotulo}
       </span>
     </Celula>

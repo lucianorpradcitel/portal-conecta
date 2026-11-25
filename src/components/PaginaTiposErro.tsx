@@ -1,0 +1,302 @@
+import { useEffect, useMemo, useState } from 'react'
+import { apiGet } from '../services/api'
+import { ROTULO_RESPONSABILIDADE } from '../services/responsabilidade'
+import {
+  coletaTiposErro,
+  descreverValidacao,
+  formatarDataHora,
+  rotuloOrigem,
+  useTiposErro,
+  validarTipoErro,
+} from '../services/tiposErro'
+import type { PlataformaResumo } from '../types/integracao'
+import type { TipoErro } from '../types/tiposErro'
+import { Alerta } from './ui/Alerta'
+import { IconeCheck, IconeCheckCirculo, IconeEscudo } from './ui/Icones'
+import {
+  BotaoAtualizar,
+  CampoBusca,
+  Carregando,
+  CartaoConsulta,
+  Celula,
+  Codigo,
+  EstadoVazio,
+  EtiquetaPlataforma,
+  Linha,
+  RodapeContagem,
+  SelectFiltro,
+  Tabela,
+} from './ui/Tabela'
+
+type Filtro = 'pendentes' | 'validados' | 'todos'
+
+const coletaAgora = () => coletaTiposErro.sincronizar()
+
+/** Remove acentos e caixa, para a busca achar "integracao" em "Integração". */
+function normalizar(texto?: string | null): string {
+  return (texto ?? '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+}
+
+const CLASSE_BOTAO_ACAO =
+  'inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium transition-all duration-150 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/25 disabled:cursor-not-allowed disabled:active:scale-100'
+const CLASSE_BOTAO_PRIMARIO = `${CLASSE_BOTAO_ACAO} bg-ink-900 text-white hover:bg-ink-800 disabled:bg-slate-300 disabled:text-slate-500 dark:bg-brand-500 dark:text-ink-950 dark:hover:bg-brand-400 dark:disabled:bg-slate-200 dark:disabled:text-slate-400`
+const CLASSE_BOTAO_SECUNDARIO = `${CLASSE_BOTAO_ACAO} border border-slate-200 bg-surface text-slate-700 shadow-soft hover:border-slate-300 hover:bg-slate-50 disabled:text-slate-400`
+
+/**
+ * Tipos de erro (CADMSG) para o DEV e o ADM conferirem. Cada tipo define a responsabilidade de todos os erros ligados a
+ * ele, e quem decide de início é a IA (ou a carga). Aqui uma pessoa confirma ou troca a responsabilidade; a API grava
+ * quem validou e quando. Trocar vale para todos os erros do tipo, de uma vez.
+ */
+export function PaginaTiposErro() {
+  const { tipos, pendentes, carregado, falha, sincronizando } = useTiposErro()
+  const [filtro, setFiltro] = useState<Filtro>('pendentes')
+  const [busca, setBusca] = useState('')
+  // PLA_SISEXT -> nome da plataforma. Sem isso a tela mostraria só o código (ex.: 1005).
+  const [nomes, setNomes] = useState<Map<string, string>>(new Map())
+  // A responsabilidade escolhida em cada linha, enquanto não foi salva.
+  const [escolhas, setEscolhas] = useState<Record<number, number>>({})
+  const [salvando, setSalvando] = useState<number | null>(null)
+  const [aviso, setAviso] = useState<{ tom: 'sucesso' | 'erro'; texto: string } | null>(null)
+
+  useEffect(() => {
+    let ativo = true
+    apiGet<PlataformaResumo[]>('/plataformas')
+      .then((lista) => {
+        if (ativo) setNomes(new Map(lista.map((p) => [p.sistemaExterno, p.descricao])))
+      })
+      .catch((e: unknown) => console.error('[TIPOS DE ERRO] Erro ao carregar plataformas', e))
+    return () => {
+      ativo = false
+    }
+  }, [])
+
+  const nomeDaPlataforma = (codigo: string) => nomes.get(codigo) ?? codigo
+
+  const validados = tipos.length - pendentes
+  const visiveis = useMemo(() => {
+    const termo = normalizar(busca.trim())
+    return [...tipos]
+      .filter((t) => (filtro === 'todos' ? true : filtro === 'pendentes' ? t.validado !== 'S' : t.validado === 'S'))
+      .filter(
+        (t) =>
+          !termo ||
+          normalizar(t.codigoErro).includes(termo) ||
+          normalizar(t.exemplo).includes(termo) ||
+          normalizar(t.plataforma).includes(termo) ||
+          normalizar(nomes.get(t.plataforma)).includes(termo),
+      )
+      .sort((a, b) => b.dataCadastro.localeCompare(a.dataCadastro))
+  }, [tipos, filtro, busca, nomes])
+
+  async function validar(tipo: TipoErro) {
+    const escolhida = escolhas[tipo.codigo] ?? tipo.status
+    const mudou = escolhida !== tipo.status
+    setSalvando(tipo.codigo)
+    setAviso(null)
+    try {
+      await validarTipoErro(tipo.codigo, mudou ? escolhida : undefined)
+      setEscolhas((atual) => {
+        const { [tipo.codigo]: _descartada, ...resto } = atual
+        return resto
+      })
+      setAviso({
+        tom: 'sucesso',
+        texto: `${tipo.codigoErro} (${nomeDaPlataforma(tipo.plataforma)}) ${mudou ? 'reclassificado e validado' : 'validado'}.`,
+      })
+    } catch (e) {
+      setAviso({ tom: 'erro', texto: e instanceof Error ? e.message : 'Não foi possível validar o tipo.' })
+    } finally {
+      setSalvando(null)
+    }
+  }
+
+  const abas: { id: Filtro; rotulo: string; contador: number }[] = [
+    { id: 'pendentes', rotulo: 'Não validados', contador: pendentes },
+    { id: 'validados', rotulo: 'Validados', contador: validados },
+    { id: 'todos', rotulo: 'Todos', contador: tipos.length },
+  ]
+
+  const cabecalho = (
+    <>
+      <div className="inline-flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Situação do tipo">
+        {abas.map(({ id, rotulo, contador }) => {
+          const ativa = filtro === id
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={ativa}
+              onClick={() => setFiltro(id)}
+              className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-sm font-medium transition-all duration-150 ${
+                ativa
+                  ? 'bg-surface text-slate-900 shadow-soft ring-1 ring-slate-200/80 dark:bg-slate-200 dark:ring-slate-300/60'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              {rotulo}
+              <span
+                className={`min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+                  id === 'pendentes' && contador > 0
+                    ? ativa
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-amber-100 text-amber-700'
+                    : 'bg-slate-200/70 text-slate-500'
+                }`}
+              >
+                {contador}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <BotaoAtualizar onClick={() => void coletaAgora()} carregando={sincronizando} />
+    </>
+  )
+
+  if (!carregado) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
+        {falha ? (
+          <EstadoVazio
+            tom="erro"
+            icone={<IconeEscudo />}
+            titulo="Não foi possível carregar os tipos de erro"
+            texto="A API não respondeu. Tente atualizar em instantes."
+            acao={<BotaoAtualizar onClick={() => void coletaAgora()} carregando={sincronizando} />}
+          />
+        ) : (
+          <Carregando texto="Carregando tipos de erro…" />
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {aviso && <Alerta tom={aviso.tom}>{aviso.texto}</Alerta>}
+
+      <CartaoConsulta
+        cabecalho={cabecalho}
+        filtros={
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,24rem)]">
+            <CampoBusca
+              aria-label="Buscar tipo de erro"
+              placeholder="Buscar por plataforma, código ou mensagem…"
+              value={busca}
+              onChange={setBusca}
+            />
+          </div>
+        }
+        rodape={visiveis.length === 0 ? undefined : <RodapeContagem visiveis={visiveis.length} total={tipos.length} />}
+      >
+        {visiveis.length === 0 ? (
+          filtro === 'pendentes' && !busca.trim() ? (
+            <EstadoVazio
+              tom="sucesso"
+              icone={<IconeCheck />}
+              titulo="Nenhum tipo aguardando validação"
+              texto="Todos os tipos de erro já foram conferidos por uma pessoa."
+            />
+          ) : (
+            <EstadoVazio icone={<IconeEscudo />} texto="Nenhum tipo encontrado com esses filtros." />
+          )
+        ) : (
+          <Tabela
+            colunas={[
+              { rotulo: 'Plataforma' },
+              { rotulo: 'Código do erro' },
+              { rotulo: 'Mensagem de exemplo', className: 'w-full' },
+              { rotulo: 'Origem' },
+              { rotulo: 'Cadastrado em' },
+              { rotulo: 'Responsabilidade' },
+              { rotulo: 'Ação' },
+            ]}
+          >
+            {visiveis.map((tipo) => {
+              const escolhida = escolhas[tipo.codigo] ?? tipo.status
+              const mudou = escolhida !== tipo.status
+              const validado = tipo.validado === 'S'
+              const ocupado = salvando === tipo.codigo
+              return (
+                <Linha key={tipo.codigo}>
+                  <Celula primeira className="whitespace-nowrap">
+                    <EtiquetaPlataforma nome={nomeDaPlataforma(tipo.plataforma)} />
+                  </Celula>
+                  <Celula className="whitespace-nowrap">
+                    <Codigo>{tipo.codigoErro}</Codigo>
+                  </Celula>
+                  <Celula className="min-w-[18rem]">
+                    <p className="line-clamp-3 break-words leading-relaxed text-slate-600" title={tipo.exemplo ?? undefined}>
+                      {tipo.exemplo || <span className="text-slate-400">Sem exemplo</span>}
+                    </p>
+                  </Celula>
+                  <Celula className="whitespace-nowrap text-slate-600">{rotuloOrigem(tipo.origem)}</Celula>
+                  <Celula className="whitespace-nowrap tabular-nums text-slate-600">
+                    {formatarDataHora(tipo.dataCadastro) ?? '—'}
+                  </Celula>
+                  <Celula className="whitespace-nowrap">
+                    <div className="w-44">
+                      <SelectFiltro
+                        aria-label={`Responsabilidade de ${tipo.codigoErro}`}
+                        value={String(escolhida)}
+                        disabled={ocupado}
+                        onChange={(v) => setEscolhas((atual) => ({ ...atual, [tipo.codigo]: Number(v) }))}
+                      >
+                        {Object.entries(ROTULO_RESPONSABILIDADE)
+                          // "A classificar" (0) só aparece se o tipo já está nele: não faz sentido validar como 0.
+                          .filter(([n]) => Number(n) !== 0 || tipo.status === 0)
+                          .map(([n, info]) => (
+                            <option key={n} value={n}>
+                              {info.rotulo} ({n})
+                            </option>
+                          ))}
+                      </SelectFiltro>
+                    </div>
+                  </Celula>
+                  <Celula ultima className="whitespace-nowrap">
+                    {validado && !mudou ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-emerald-700"
+                        title={descreverValidacao(tipo)}
+                      >
+                        <span className="h-4 w-4">
+                          <IconeCheckCirculo />
+                        </span>
+                        Validado
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className={validado ? CLASSE_BOTAO_SECUNDARIO : CLASSE_BOTAO_PRIMARIO}
+                        disabled={ocupado || escolhida === 0}
+                        title={descreverValidacao(tipo)}
+                        onClick={() => void validar(tipo)}
+                      >
+                        {ocupado ? 'Salvando…' : validado ? 'Reclassificar' : mudou ? 'Reclassificar e validar' : 'Validar'}
+                      </button>
+                    )}
+                  </Celula>
+                </Linha>
+              )
+            })}
+          </Tabela>
+        )}
+      </CartaoConsulta>
+    </div>
+  )
+}
+
+/** Quantos tipos aguardam validação, para o menu lateral. Só monta para quem pode validar (DEV e ADM). */
+export function ContadorTiposPendentes() {
+  const { pendentes, carregado } = useTiposErro()
+  if (!carregado || pendentes === 0) return null
+  return (
+    <span
+      className="ml-auto min-w-[1.25rem] rounded-full bg-amber-400/90 px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums text-ink-950"
+      title={`${pendentes} ${pendentes === 1 ? 'tipo aguarda' : 'tipos aguardam'} validação`}
+    >
+      {pendentes}
+    </span>
+  )
+}

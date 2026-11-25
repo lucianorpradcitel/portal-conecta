@@ -12,6 +12,8 @@ export interface PedidoComErro {
   sequencialProcessamento?: number
   /** De quem é o erro (0 a 4), lido do tipo do erro. Ausente em API antiga; vale 0 (veja services/responsabilidade.ts). */
   responsabilidade?: number | null
+  /** PEN_CODMSG: o tipo do erro (GET /tipos-erro). Nulo = erro sem tipo. */
+  codigoMensagem?: number | null
 }
 
 /** Item do GET /pedidos?cliente= — todos os pedidos de um lojista, em qualquer status. */
@@ -67,4 +69,6 @@ export interface ProdutoComErro {
   tentativa?: number
   /** De quem é o erro (0 a 4), lido do tipo do erro. Ausente em API antiga; vale 0 (veja services/responsabilidade.ts). */
   responsabilidade?: number | null
+  /** PRO_CODMSG: o tipo do erro (GET /tipos-erro). Nulo = erro sem tipo. */
+  codigoMensagem?: number | null
 }

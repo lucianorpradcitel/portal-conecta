@@ -5,31 +5,36 @@ import { temPerfil, type Perfil } from './api'
  * 0 não informado (inclui o erro ainda sem tipo), 1 culpa nossa, 2 culpa do cliente, 3 instabilidade, 4 culpa da
  * plataforma externa. Não é o `status` do pedido, que é a situação na fila.
  */
-export const ROTULO_RESPONSABILIDADE: Record<number, { rotulo: string; dica: string; classe: string }> = {
+export const ROTULO_RESPONSABILIDADE: Record<number, { rotulo: string; dica: string; classe: string; tracejado: string }> = {
   0: {
     rotulo: 'A classificar',
     dica: 'Ainda sem tipo de erro: ninguém definiu de quem é a responsabilidade',
     classe: 'bg-slate-100 text-slate-600 ring-slate-500/20',
+    tracejado: 'border border-dashed border-slate-400 text-slate-600',
   },
   1: {
     rotulo: 'Nossa',
     dica: 'Culpa nossa (integração): o time precisa agir',
     classe: 'bg-red-50 text-red-700 ring-red-600/15',
+    tracejado: 'border border-dashed border-red-400 bg-red-50/40 text-red-700',
   },
   2: {
     rotulo: 'Cliente',
     dica: 'Culpa do cliente (lojista): precisa corrigir o cadastro no ERP',
     classe: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+    tracejado: 'border border-dashed border-amber-500 bg-amber-50/40 text-amber-700',
   },
   3: {
     rotulo: 'Instabilidade',
     dica: 'Passageira (ERP ou plataforma fora do ar): a próxima tentativa costuma resolver',
     classe: 'bg-sky-50 text-sky-700 ring-sky-600/15',
+    tracejado: 'border border-dashed border-sky-400 bg-sky-50/40 text-sky-700',
   },
   4: {
     rotulo: 'Plataforma',
     dica: 'Culpa da plataforma externa',
     classe: 'bg-indigo-50 text-indigo-700 ring-indigo-600/15',
+    tracejado: 'border border-dashed border-indigo-400 bg-indigo-50/40 text-indigo-700',
   },
 }
 

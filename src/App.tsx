@@ -7,15 +7,16 @@ import { ErroNaTela } from './components/ui/ErroNaTela'
 import { PainelSucesso } from './components/PainelSucesso'
 import { TelaLogin } from './components/TelaLogin'
 import { PaginaWorkflows } from './components/PaginaWorkflows'
+import { ContadorTiposPendentes, PaginaTiposErro } from './components/PaginaTiposErro'
 import { perfilDaSessao, registrarExpiracao, sair, temPerfil, temSessao, usuarioDaSessao, type Perfil } from './services/api'
 import { carregarRecursos, type Recurso } from './services/acesso'
 import type { IntegracaoCriada } from './types/integracao'
 import { MenuUsuario } from './components/MenuUsuario'
 import { AlternarTema } from './components/ui/AlternarTema'
 import { Segredos } from './segredos/Segredos'
-import { IconeAtividade, IconeCamadas, IconeCaixa, IconeLink, IconeMais } from './components/ui/Icones'
+import { IconeAtividade, IconeCamadas, IconeCaixa, IconeEscudo, IconeLink, IconeMais } from './components/ui/Icones'
 
-type Aba = 'monitoramento' | 'integracao' | 'consulta' | 'plataformas' | 'workflows'
+type Aba = 'monitoramento' | 'tipos-erro' | 'integracao' | 'consulta' | 'plataformas' | 'workflows'
 
 // `perfilMinimo` esconde a aba de quem tem um perfil menor (USR < DEV < ADM; USR_PERFIL, claim "perfil" do token).
 // Sem ele, a aba é de todos. `recurso` a restringe também à lista do n8n (veja services/acesso.ts). Esconder é só
@@ -33,6 +34,13 @@ const ABAS: {
     rotulo: 'Monitoramento',
     descricao: 'Pedidos e produtos com falha de integração, acompanhados em tempo real.',
     Icone: IconeAtividade,
+  },
+  {
+    id: 'tipos-erro',
+    rotulo: 'Tipos de erro',
+    descricao: 'Confira e valide de quem é a responsabilidade que a IA ou a carga definiu para cada tipo de erro. Restrito ao time de integrações.',
+    Icone: IconeEscudo,
+    perfilMinimo: 'DEV',
   },
   {
     id: 'plataformas',
@@ -66,6 +74,7 @@ const ABAS: {
 // As consultas têm tabelas largas; os formulários ficam mais estreitos.
 const LARGURA: Record<Aba, string> = {
   monitoramento: 'max-w-none',
+  'tipos-erro': 'max-w-none',
   consulta: 'max-w-none',
   integracao: 'max-w-5xl',
   // Largura total: a matriz de funcionalidades tem tabela larga. O formulário de cadastro limita a própria largura.
@@ -191,6 +200,7 @@ export default function App() {
                   <Icone />
                 </span>
                 {rotulo}
+                {id === 'tipos-erro' && <ContadorTiposPendentes />}
                 {id === 'monitoramento' && (
                   <span className="relative ml-auto flex h-2 w-2" title="Ao vivo">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-60" />
@@ -232,6 +242,13 @@ export default function App() {
               {aba === 'monitoramento' && (
                 <div className="animate-fade-in">
                   <Monitoramento />
+                </div>
+              )}
+
+              {/* Só monta quando aberta: a releitura dos tipos de erro não roda em segundo plano. DEV e ADM validam. */}
+              {temPerfil('DEV') && aba === 'tipos-erro' && (
+                <div className="animate-fade-in">
+                  <PaginaTiposErro />
                 </div>
               )}
 
