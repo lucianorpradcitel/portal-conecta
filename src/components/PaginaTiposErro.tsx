@@ -15,6 +15,7 @@ import { Alerta } from './ui/Alerta'
 import { IconeCheck, IconeCheckCirculo, IconeEscudo } from './ui/Icones'
 import {
   BotaoAtualizar,
+  BotaoLimpar,
   CampoBusca,
   Carregando,
   CartaoConsulta,
@@ -31,6 +32,9 @@ import {
 type Filtro = 'pendentes' | 'validados' | 'todos'
 
 const coletaAgora = () => coletaTiposErro.sincronizar()
+
+const CLASSE_CAMPO_DATA =
+  'block h-9 rounded-lg border-slate-200 bg-surface px-2.5 text-sm text-slate-700 shadow-soft transition duration-150 hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15'
 
 /** Remove acentos e caixa, para a busca achar "integracao" em "Integração". */
 function normalizar(texto?: string | null): string {
@@ -51,6 +55,10 @@ export function PaginaTiposErro() {
   const { tipos, pendentes, carregado, falha, sincronizando } = useTiposErro()
   const [filtro, setFiltro] = useState<Filtro>('pendentes')
   const [busca, setBusca] = useState('')
+  // Quem validou e quando (dia da validação, as duas pontas inclusivas). Só valem nas visões Validados e Todos.
+  const [usuario, setUsuario] = useState('')
+  const [de, setDe] = useState('')
+  const [ate, setAte] = useState('')
   // PLA_SISEXT -> nome da plataforma. Sem isso a tela mostraria só o código (ex.: 1005).
   const [nomes, setNomes] = useState<Map<string, string>>(new Map())
   // A responsabilidade escolhida em cada linha, enquanto não foi salva.
@@ -73,6 +81,16 @@ export function PaginaTiposErro() {
   const nomeDaPlataforma = (codigo: string) => nomes.get(codigo) ?? codigo
 
   const validados = tipos.length - pendentes
+  const comFiltroDeValidacao = filtro !== 'pendentes'
+  // Quem já validou algum tipo: as opções do filtro de usuário.
+  const usuarios = useMemo(
+    () =>
+      Array.from(new Set(tipos.map((t) => t.usuarioValidacao?.trim()).filter((u): u is string => !!u))).sort((a, b) =>
+        a.localeCompare(b, 'pt-BR'),
+      ),
+    [tipos],
+  )
+  const temFiltro = !!busca || (comFiltroDeValidacao && !!(usuario || de || ate))
   const visiveis = useMemo(() => {
     const termo = normalizar(busca.trim())
     return [...tipos]
@@ -85,8 +103,22 @@ export function PaginaTiposErro() {
           normalizar(t.plataforma).includes(termo) ||
           normalizar(nomes.get(t.plataforma)).includes(termo),
       )
+      // Em "Todos", quem não foi validado não tem usuário nem data: sai quando um desses filtros está ligado.
+      .filter((t) => !comFiltroDeValidacao || !usuario || t.usuarioValidacao?.trim() === usuario)
+      .filter((t) => {
+        if (!comFiltroDeValidacao || (!de && !ate)) return true
+        const dia = t.dataValidacao?.slice(0, 10)
+        return !!dia && (!de || dia >= de) && (!ate || dia <= ate)
+      })
       .sort((a, b) => b.dataCadastro.localeCompare(a.dataCadastro))
-  }, [tipos, filtro, busca, nomes])
+  }, [tipos, filtro, busca, nomes, comFiltroDeValidacao, usuario, de, ate])
+
+  function limparFiltros() {
+    setBusca('')
+    setUsuario('')
+    setDe('')
+    setAte('')
+  }
 
   async function validar(tipo: TipoErro) {
     const escolhida = escolhas[tipo.codigo] ?? tipo.status
@@ -179,13 +211,52 @@ export function PaginaTiposErro() {
       <CartaoConsulta
         cabecalho={cabecalho}
         filtros={
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,24rem)]">
-            <CampoBusca
-              aria-label="Buscar tipo de erro"
-              placeholder="Buscar por plataforma, código ou mensagem…"
-              value={busca}
-              onChange={setBusca}
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-full sm:w-96">
+              <CampoBusca
+                aria-label="Buscar tipo de erro"
+                placeholder="Buscar por plataforma, código ou mensagem…"
+                value={busca}
+                onChange={setBusca}
+              />
+            </div>
+            {comFiltroDeValidacao && (
+              <>
+                <div className="w-full sm:w-52">
+                  <SelectFiltro aria-label="Validado por" value={usuario} onChange={setUsuario}>
+                    <option value="">Todos os usuários</option>
+                    {usuarios.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </SelectFiltro>
+                </div>
+                <label className="flex items-center gap-2 text-[13px] text-slate-500">
+                  <span>Validado de</span>
+                  <input
+                    type="date"
+                    aria-label="Validado a partir de"
+                    value={de}
+                    max={ate || undefined}
+                    onChange={(ev) => setDe(ev.target.value)}
+                    className={CLASSE_CAMPO_DATA}
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-[13px] text-slate-500">
+                  <span>até</span>
+                  <input
+                    type="date"
+                    aria-label="Validado até"
+                    value={ate}
+                    min={de || undefined}
+                    onChange={(ev) => setAte(ev.target.value)}
+                    className={CLASSE_CAMPO_DATA}
+                  />
+                </label>
+              </>
+            )}
+            <BotaoLimpar onClick={limparFiltros} disabled={!temFiltro} />
           </div>
         }
         rodape={visiveis.length === 0 ? undefined : <RodapeContagem visiveis={visiveis.length} total={tipos.length} />}
