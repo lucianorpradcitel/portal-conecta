@@ -6,6 +6,14 @@ import {
   lerEstadoFilas,
   sincronizarFilas,
 } from '../services/filas'
+import {
+  adicionarResponsabilidade,
+  ROTULO_RESPONSABILIDADE,
+  visaoInicial,
+  visoesDoPerfil,
+  type DefinicaoVisao,
+  type Visao,
+} from '../services/responsabilidade'
 import { coletaWebservices } from '../services/webservices'
 import { classificarClientes } from '../types/filas'
 import type { FiltrosProdutos, PaginaProdutos, PedidoComErro, ProdutoComErro } from '../types/monitoramento'
@@ -111,8 +119,9 @@ const CONSULTA_PRODUTOS_INICIAL: ConsultaProdutos = {
   erro: '',
 }
 
-function montarQueryProdutos(c: ConsultaProdutos): string {
+function montarQueryProdutos(c: ConsultaProdutos, visao: Visao): string {
   const params = new URLSearchParams({ pagina: String(c.pagina), tamanho: String(c.tamanho), ordem: c.ordem })
+  adicionarResponsabilidade(params, visao)
   const filtros = { produtoContem: c.produto, cliente: c.cliente, plataforma: c.plataforma, erroContem: c.erro }
   for (const [nome, valor] of Object.entries(filtros)) {
     if (valor) params.set(nome, valor)
@@ -190,6 +199,11 @@ export function Monitoramento() {
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_VAZIOS)
   const [consulta, setConsulta] = useState<ConsultaProdutos>(CONSULTA_PRODUTOS_INICIAL)
 
+  // O recorte por responsabilidade (Padrão, Usuários, Todos) vale para pedidos e produtos. O perfil da sessão
+  // decide quais a pessoa vê: o USR só tem "Usuários". A API barra de novo quem pedir o que não pode.
+  const visoes = useMemo(visoesDoPerfil, [])
+  const [visao, setVisao] = useState<Visao>(visaoInicial)
+
   // O retrato das filas vive no serviço, não aqui: ao trocar de tela e voltar, o último retrato
   // continua na tela e a coleta só acontece quando passam 5 minutos ou a pessoa pede.
   const {
@@ -214,7 +228,9 @@ export function Monitoramento() {
 
     // Falha numa atualização não limpa a tela: fica o último retrato bom até a próxima.
     function carregar() {
-      apiGet<PedidoComErro[]>('/pendentes?status=2')
+      const params = new URLSearchParams({ status: '2' })
+      adicionarResponsabilidade(params, visao)
+      apiGet<PedidoComErro[]>(`/pendentes?${params.toString()}`)
         .then((recebidos) => {
           if (!ativo) return
           setPedidos((atual) => mesclar(atual, recebidos, chavePedido))
@@ -233,7 +249,7 @@ export function Monitoramento() {
       ativo = false
       clearInterval(intervalo)
     }
-  }, [])
+  }, [visao])
 
   // Produtos: o polling de 10s continua, mas cada GET pede só a página atual. Mudou a página, o tamanho
   // ou a ordem, o efeito recomeça e já busca na hora; a atualização automática mantém tudo isso.
@@ -241,7 +257,7 @@ export function Monitoramento() {
     let ativo = true
 
     function carregar() {
-      apiGet<PaginaProdutos>(`/produtos?${montarQueryProdutos(consulta)}`)
+      apiGet<PaginaProdutos>(`/produtos?${montarQueryProdutos(consulta, visao)}`)
         .then((resposta) => {
           if (!ativo) return
           setTotalProdutos(resposta.totalItens)
@@ -267,7 +283,7 @@ export function Monitoramento() {
       ativo = false
       clearInterval(intervalo)
     }
-  }, [consulta])
+  }, [consulta, visao])
 
   // Opções dos filtros de produtos: um GET à parte, leve, que acompanha o ritmo da lista
   const { cliente: clienteConsultado, plataforma: plataformaConsultada } = consulta
@@ -350,6 +366,12 @@ export function Monitoramento() {
     setFiltros(FILTROS_VAZIOS)
   }
 
+  /** Outra visão recomeça os produtos da página 1; os pedidos vêm inteiros, então só refazem a consulta. */
+  function trocarVisao(nova: Visao) {
+    setVisao(nova)
+    setConsulta((c) => (c.pagina === 1 ? c : { ...c, pagina: 1 }))
+  }
+
   function alterarFiltro(campo: keyof Filtros, valor: string) {
     setFiltros((f) => ({ ...f, [campo]: valor }))
   }
@@ -403,6 +425,7 @@ export function Monitoramento() {
           { rotulo: 'Produto' },
         ]),
     { rotulo: ehPedidos ? 'Processamentos' : 'Tentativas' },
+    { rotulo: 'Responsabilidade' },
     { rotulo: 'Erro', className: 'w-full' },
     { rotulo: 'Rotina' },
   ]
@@ -581,6 +604,8 @@ export function Monitoramento() {
     <div className="space-y-6">
       {resumo}
 
+      <SeletorVisao visoes={visoes} atual={visao} onTrocar={trocarVisao} />
+
       <CartaoConsulta
         cabecalho={cabecalho}
         filtros={
@@ -649,7 +674,9 @@ export function Monitoramento() {
             tom="sucesso"
             icone={<IconeCheck />}
             titulo={`Nenhum ${termo} com erro`}
-            texto={`Todos os ${termo}s foram processados com sucesso!`}
+            texto={
+              visao === 'todos' ? `Todos os ${termo}s foram processados com sucesso!` : `Nenhum ${termo} com erro nesta visão.`
+            }
           />
         ) : visiveis === 0 ? (
           <EstadoVazio
@@ -678,6 +705,7 @@ export function Monitoramento() {
                       <Codigo>{p.codigoPedido}</Codigo>
                     </Celula>
                     <CelulaContagem valor={p.sequencialProcessamento} />
+                    <CelulaResponsabilidade valor={p.responsabilidade} />
                     <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                     <CelulaRotina texto={p.rotina?.toUpperCase() || 'Não Informado'} vazia={!p.rotina} />
                   </Linha>
@@ -704,6 +732,7 @@ export function Monitoramento() {
                         <Codigo>{p.codigoProduto || '—'}</Codigo>
                       </Celula>
                       <CelulaContagem valor={p.tentativa} />
+                      <CelulaResponsabilidade valor={p.responsabilidade} />
                       <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                       <CelulaRotina texto={p.rotina?.toUpperCase() || 'N/A'} vazia={!p.rotina} />
                     </Linha>
@@ -828,6 +857,63 @@ function RodapePaginacao({
         </form>
       </div>
     </div>
+  )
+}
+
+/** Padrão, Usuários e Todos: o recorte dos erros por responsabilidade. Quem só tem uma visão vê só o texto dela. */
+function SeletorVisao({
+  visoes,
+  atual,
+  onTrocar,
+}: {
+  visoes: DefinicaoVisao[]
+  atual: Visao
+  onTrocar: (visao: Visao) => void
+}) {
+  const definicao = visoes.find((v) => v.id === atual)
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      {visoes.length > 1 && (
+        <div className="inline-flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Responsabilidade do erro">
+          {visoes.map((v) => {
+            const ativa = v.id === atual
+            return (
+              <button
+                key={v.id}
+                type="button"
+                role="tab"
+                aria-selected={ativa}
+                title={v.dica}
+                onClick={() => onTrocar(v.id)}
+                className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-all duration-150 ${
+                  ativa
+                    ? 'bg-surface text-slate-900 shadow-soft ring-1 ring-slate-200/80 dark:bg-slate-200 dark:ring-slate-300/60'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {v.rotulo}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {definicao && <p className="text-[13px] text-slate-500">{definicao.dica}</p>}
+    </div>
+  )
+}
+
+/** De quem é o erro. Sem o campo (API antiga) ou sem tipo, vale "A classificar". */
+function CelulaResponsabilidade({ valor }: { valor?: number | null }) {
+  const info = ROTULO_RESPONSABILIDADE[valor ?? 0] ?? ROTULO_RESPONSABILIDADE[0]
+  return (
+    <Celula className="whitespace-nowrap">
+      <span
+        title={info.dica}
+        className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${info.classe}`}
+      >
+        {info.rotulo}
+      </span>
+    </Celula>
   )
 }
 
