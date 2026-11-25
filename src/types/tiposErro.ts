@@ -10,8 +10,6 @@ export interface TipoErro {
   status: number
   /** S = uma pessoa conferiu a responsabilidade; N = ainda não. */
   validado: 'S' | 'N'
-  /** Quem cadastrou o tipo: C carga, I IA, U usuário. */
-  origem: string
   /** Uma mensagem real de exemplo, para quem for validar. */
   exemplo?: string | null
   idExemplo?: string | null

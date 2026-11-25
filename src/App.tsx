@@ -38,7 +38,7 @@ const ABAS: {
   {
     id: 'tipos-erro',
     rotulo: 'Tipos de erro',
-    descricao: 'Confira e valide de quem é a responsabilidade que a IA ou a carga definiu para cada tipo de erro. Restrito ao time de integrações.',
+    descricao: 'Confira e valide de quem é a responsabilidade que a IA definiu para cada tipo de erro. Restrito ao time de integrações.',
     Icone: IconeEscudo,
     perfilMinimo: 'DEV',
   },

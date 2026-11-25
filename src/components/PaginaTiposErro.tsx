@@ -5,7 +5,6 @@ import {
   coletaTiposErro,
   descreverValidacao,
   formatarDataHora,
-  rotuloOrigem,
   useTiposErro,
   validarTipoErro,
 } from '../services/tiposErro'
@@ -49,7 +48,7 @@ const CLASSE_BOTAO_SECUNDARIO = `${CLASSE_BOTAO_ACAO} border border-slate-200 bg
 
 /**
  * Tipos de erro (CADMSG) para o DEV e o ADM conferirem. Cada tipo define a responsabilidade de todos os erros ligados a
- * ele, e quem decide de início é a IA (ou a carga). Aqui uma pessoa confirma ou troca a responsabilidade; a API grava
+ * ele, e quem decide de início é a IA. Aqui uma pessoa confirma ou troca a responsabilidade; a API grava
  * quem validou e quando. Trocar vale para todos os erros do tipo, de uma vez.
  */
 export function PaginaTiposErro() {
@@ -83,9 +82,6 @@ export function PaginaTiposErro() {
 
   const validados = tipos.length - pendentes
   const comFiltroDeValidacao = filtro !== 'pendentes'
-  // Em "Não validados" a origem não separa nada (o n8n só cria tipo como IA e não validado), então a coluna sai.
-  // Um tipo de carga que esteja pendente continua dizendo isso no hover do selo.
-  const mostrarOrigem = filtro !== 'pendentes'
   // Quem já validou algum tipo: as opções do filtro de usuário.
   const usuarios = useMemo(
     () =>
@@ -282,7 +278,6 @@ export function PaginaTiposErro() {
               { rotulo: 'Plataforma' },
               { rotulo: 'Código do erro' },
               { rotulo: 'Mensagem de exemplo', className: 'w-full' },
-              ...(mostrarOrigem ? [{ rotulo: 'Origem' }] : []),
               { rotulo: 'Cadastrado em' },
               { rotulo: 'Responsabilidade' },
               { rotulo: 'Alterar para' },
@@ -307,7 +302,6 @@ export function PaginaTiposErro() {
                       {tipo.exemplo || <span className="text-slate-400">Sem exemplo</span>}
                     </p>
                   </Celula>
-                  {mostrarOrigem && <Celula className="whitespace-nowrap text-slate-600">{rotuloOrigem(tipo.origem)}</Celula>}
                   <Celula className="whitespace-nowrap tabular-nums text-slate-600">
                     {formatarDataHora(tipo.dataCadastro) ?? '—'}
                   </Celula>

@@ -34,12 +34,6 @@ export async function validarTipoErro(codigo: number, status?: number): Promise<
   return tipo
 }
 
-const ORIGEM: Record<string, string> = { C: 'Carga', I: 'IA', U: 'Usuário' }
-
-export function rotuloOrigem(origem?: string | null): string {
-  return ORIGEM[(origem ?? '').trim().toUpperCase()] ?? 'Não informada'
-}
-
 export function formatarDataHora(valor?: string | null): string | null {
   if (!valor) return null
   const d = new Date(valor)
@@ -47,15 +41,13 @@ export function formatarDataHora(valor?: string | null): string | null {
   return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-/** A frase do hover: quem validou, ou como o tipo nasceu e que ainda falta validar. */
+/** A frase do hover: quem validou, ou que a IA definiu e ainda falta validar. */
 export function descreverValidacao(tipo: TipoErro): string {
   if (tipo.validado === 'S') {
     const quem = tipo.usuarioValidacao?.trim()
     const quando = formatarDataHora(tipo.dataValidacao)
     return `Validado${quem ? ` por ${quem}` : ''}${quando ? ` em ${quando}` : ''}`
   }
-  const origem = (tipo.origem ?? '').trim().toUpperCase()
-  const como =
-    origem === 'I' ? 'Definido pela IA' : origem === 'C' ? 'Cadastrado por carga' : origem === 'U' ? 'Cadastrado por usuário' : 'Origem não informada'
-  return `${como}, ainda não validado`
+  // O tipo sempre nasce da IA; a pessoa só valida ou reclassifica.
+  return 'Definido pela IA, ainda não validado'
 }
