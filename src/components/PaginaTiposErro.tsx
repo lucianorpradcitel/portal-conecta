@@ -82,6 +82,8 @@ export function PaginaTiposErro() {
 
   const validados = tipos.length - pendentes
   const comFiltroDeValidacao = filtro !== 'pendentes'
+  // Só em "Validados" todo tipo tem quem validou; em "Todos" a coluna ficaria vazia nos pendentes.
+  const mostrarValidadoPor = filtro === 'validados'
   // Quem já validou algum tipo: as opções do filtro de usuário.
   const usuarios = useMemo(
     () =>
@@ -279,6 +281,7 @@ export function PaginaTiposErro() {
               { rotulo: 'Código do erro' },
               { rotulo: 'Mensagem de exemplo', className: 'w-full' },
               { rotulo: 'Cadastrado em' },
+              ...(mostrarValidadoPor ? [{ rotulo: 'Validado por' }] : []),
               { rotulo: 'Responsabilidade' },
               { rotulo: 'Alterar para' },
               { rotulo: 'Ação' },
@@ -305,6 +308,22 @@ export function PaginaTiposErro() {
                   <Celula className="whitespace-nowrap tabular-nums text-slate-600">
                     {formatarDataHora(tipo.dataCadastro) ?? '—'}
                   </Celula>
+                  {mostrarValidadoPor && (
+                    <Celula className="whitespace-nowrap">
+                      {tipo.usuarioValidacao?.trim() ? (
+                        <>
+                          <div className="max-w-[12rem] truncate text-slate-700" title={tipo.usuarioValidacao}>
+                            {tipo.usuarioValidacao}
+                          </div>
+                          {formatarDataHora(tipo.dataValidacao) && (
+                            <div className="text-xs tabular-nums text-slate-400">{formatarDataHora(tipo.dataValidacao)}</div>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-slate-400">Não informado</span>
+                      )}
+                    </Celula>
+                  )}
                   <Celula className="whitespace-nowrap">
                     <SeloResponsabilidade valor={tipo.status} tipo={tipo} />
                   </Celula>
