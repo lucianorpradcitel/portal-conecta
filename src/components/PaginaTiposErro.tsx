@@ -83,6 +83,9 @@ export function PaginaTiposErro() {
 
   const validados = tipos.length - pendentes
   const comFiltroDeValidacao = filtro !== 'pendentes'
+  // Em "Não validados" a origem não separa nada (o n8n só cria tipo como IA e não validado), então a coluna sai.
+  // Um tipo de carga que esteja pendente continua dizendo isso no hover do selo.
+  const mostrarOrigem = filtro !== 'pendentes'
   // Quem já validou algum tipo: as opções do filtro de usuário.
   const usuarios = useMemo(
     () =>
@@ -279,7 +282,7 @@ export function PaginaTiposErro() {
               { rotulo: 'Plataforma' },
               { rotulo: 'Código do erro' },
               { rotulo: 'Mensagem de exemplo', className: 'w-full' },
-              { rotulo: 'Origem' },
+              ...(mostrarOrigem ? [{ rotulo: 'Origem' }] : []),
               { rotulo: 'Cadastrado em' },
               { rotulo: 'Responsabilidade' },
               { rotulo: 'Alterar para' },
@@ -304,7 +307,7 @@ export function PaginaTiposErro() {
                       {tipo.exemplo || <span className="text-slate-400">Sem exemplo</span>}
                     </p>
                   </Celula>
-                  <Celula className="whitespace-nowrap text-slate-600">{rotuloOrigem(tipo.origem)}</Celula>
+                  {mostrarOrigem && <Celula className="whitespace-nowrap text-slate-600">{rotuloOrigem(tipo.origem)}</Celula>}
                   <Celula className="whitespace-nowrap tabular-nums text-slate-600">
                     {formatarDataHora(tipo.dataCadastro) ?? '—'}
                   </Celula>
