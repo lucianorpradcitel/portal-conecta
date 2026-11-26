@@ -211,7 +211,7 @@ export function PaginaTiposErro() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 [&>.cartao-consulta]:min-h-0 [&>.cartao-consulta]:flex-1 [&_.tabela-rolavel]:max-h-none">
       {aviso && <Alerta tom={aviso.tom}>{aviso.texto}</Alerta>}
 
       <CartaoConsulta

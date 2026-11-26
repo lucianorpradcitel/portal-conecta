@@ -182,6 +182,8 @@ export default function App() {
   const expandido = !recolhido || pairando
   // Largura que a tela precisa: as consultas usam a tela inteira; só os formulários ficam estreitos e centralizados.
   const larguraTotal = LARGURA[aba] === 'max-w-none'
+  // O Monitoramento não rola a página: ele ocupa a janela e só a lista rola, por dentro.
+  const telaCheia = aba === 'monitoramento' || aba === 'tipos-erro'
 
   return (
     <div className={`min-h-screen bg-slate-50 transition-[padding] duration-200 ${recolhido ? 'lg:pl-[4.5rem]' : 'lg:pl-64'}`}>
@@ -281,9 +283,17 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="px-4 py-8 sm:px-6 lg:px-6 lg:py-8">
-        <div className={larguraTotal ? 'w-full' : 'mx-auto max-w-7xl'}>
-          <header key={aba} className="mb-8 flex animate-fade-in flex-wrap items-start justify-between gap-x-6 gap-y-3">
+      <main
+        className={`px-4 sm:px-6 lg:px-6 ${
+          telaCheia ? 'flex h-screen flex-col overflow-hidden py-5 lg:py-5' : 'py-8 lg:py-8'
+        }`}
+      >
+        <div
+          className={`${larguraTotal ? 'w-full' : 'mx-auto max-w-7xl'} ${
+            telaCheia ? 'flex min-h-0 flex-1 flex-col' : ''
+          }`}
+        >
+          <header key={aba} className={`${telaCheia ? 'mb-4 shrink-0' : 'mb-8'} flex animate-fade-in flex-wrap items-start justify-between gap-x-6 gap-y-3`}>
             <div>
               <h1
                 data-segredo={aba === 'monitoramento' ? 'titulo' : undefined}
@@ -291,24 +301,24 @@ export default function App() {
               >
                 {atual.rotulo}
               </h1>
-              <p className="mt-1.5 max-w-2xl text-sm text-slate-500">{atual.descricao}</p>
+              <p className={`mt-1.5 text-sm text-slate-500 ${aba === 'tipos-erro' ? 'whitespace-nowrap' : 'max-w-2xl'}`}>{atual.descricao}</p>
             </div>
             {/* Canto direito: onde a página coloca os controles dela (ex.: o seletor Dev / Cliente / Todos do Monitoramento). */}
             <div id="acoes-da-pagina" className="shrink-0" />
           </header>
 
           <ErroNaTela reiniciarCom={aba}>
-            <div className={LARGURA[aba]}>
+            <div className={`${LARGURA[aba]} ${telaCheia ? 'min-h-0 flex-1' : ''}`}>
               {/* Só monta quando aberto, para a atualização automática não rodar em segundo plano. */}
               {aba === 'monitoramento' && (
-                <div className="animate-fade-in">
+                <div className="flex h-full min-h-0 animate-fade-in flex-col">
                   <Monitoramento />
                 </div>
               )}
 
               {/* Só monta quando aberta: a releitura dos tipos de erro não roda em segundo plano. DEV e ADM validam. */}
               {temPerfil('DEV') && aba === 'tipos-erro' && (
-                <div className="animate-fade-in">
+                <div className="flex h-full min-h-0 animate-fade-in flex-col">
                   <PaginaTiposErro />
                 </div>
               )}
