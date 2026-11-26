@@ -76,7 +76,10 @@ export const VISOES: readonly DefinicaoVisao[] = [
   },
 ]
 
-/** As visões que o perfil da sessão enxerga (o USR só tem "Cliente"). */
+/**
+ * As visões que o perfil da sessão enxerga. DEV e ADM escolhem entre **Dev**, **Cliente** e **Todos**. O USR não escolhe
+ * nada: só tem "Cliente" (2 e 4, o que a API também impõe), e a tela mostra direto o que ele pode ver, sem seletor.
+ */
 export function visoesDoPerfil(): DefinicaoVisao[] {
   return VISOES.filter((v) => temPerfil(v.perfilMinimo))
 }

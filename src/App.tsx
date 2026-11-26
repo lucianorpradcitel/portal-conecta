@@ -14,7 +14,16 @@ import type { IntegracaoCriada } from './types/integracao'
 import { MenuUsuario } from './components/MenuUsuario'
 import { AlternarTema } from './components/ui/AlternarTema'
 import { Segredos } from './segredos/Segredos'
-import { IconeAtividade, IconeCamadas, IconeCaixa, IconeEscudo, IconeLink, IconeMais } from './components/ui/Icones'
+import {
+  IconeAtividade,
+  IconeCamadas,
+  IconeCaixa,
+  IconeEscudo,
+  IconeLink,
+  IconeMais,
+  IconeSetaDireita,
+  IconeSetaEsquerda,
+} from './components/ui/Icones'
 
 type Aba = 'monitoramento' | 'tipos-erro' | 'integracao' | 'consulta' | 'plataformas' | 'workflows'
 
@@ -83,6 +92,17 @@ const LARGURA: Record<Aba, string> = {
   workflows: 'max-w-none',
 }
 
+const CHAVE_MENU = 'conecta.menu-recolhido'
+
+/** O menu lateral abre recolhido (só os ícones) até a pessoa fixá-lo aberto; a escolha fica neste navegador. */
+function menuRecolhidoGuardado(): boolean {
+  try {
+    return localStorage.getItem(CHAVE_MENU) !== '0'
+  } catch {
+    return true
+  }
+}
+
 export default function App() {
   const [autenticado, setAutenticado] = useState(temSessao)
   const [avisoLogin, setAvisoLogin] = useState<string | null>(null)
@@ -95,6 +115,17 @@ export default function App() {
   const [versaoPlataformas, setVersaoPlataformas] = useState(0)
   // Recursos restritos liberados para quem está logado; vazio até o n8n responder.
   const [recursos, setRecursos] = useState<string[]>([])
+  // Menu lateral: recolhido mostra só os ícones e volta ao tamanho normal quando o mouse passa por cima (por cima do
+  // conteúdo, sem empurrá-lo). "Fixar" o deixa sempre aberto.
+  const [recolhido, setRecolhido] = useState(menuRecolhidoGuardado)
+  const [pairando, setPairando] = useState(false)
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAVE_MENU, recolhido ? '1' : '0')
+    } catch {
+      // sem armazenamento: vale só até recarregar
+    }
+  }, [recolhido])
 
   useEffect(() => {
     registrarExpiracao(() => {
@@ -148,15 +179,26 @@ export default function App() {
     (a) => temPerfil(a.perfilMinimo ?? 'USR') && (!a.recurso || recursos.includes(a.recurso)),
   )
   const atual = abasVisiveis.find((a) => a.id === aba) ?? ABAS[0]
+  const expandido = !recolhido || pairando
+  // Largura que a tela precisa: as consultas usam a tela inteira; só os formulários ficam estreitos e centralizados.
+  const larguraTotal = LARGURA[aba] === 'max-w-none'
 
   return (
-    <div className="min-h-screen bg-slate-50 lg:pl-64">
-      <aside className="escuro-fixo bg-ink-900 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-white/[0.06]">
+    <div className={`min-h-screen bg-slate-50 transition-[padding] duration-200 ${recolhido ? 'lg:pl-[4.5rem]' : 'lg:pl-64'}`}>
+      <aside
+        onMouseEnter={() => setPairando(true)}
+        onMouseLeave={() => setPairando(false)}
+        onFocusCapture={() => setPairando(true)}
+        onBlurCapture={() => setPairando(false)}
+        className={`escuro-fixo bg-ink-900 lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:flex-col lg:overflow-hidden lg:border-r lg:border-white/[0.06] lg:transition-[width,box-shadow] lg:duration-200 ${
+          expandido ? 'lg:w-64' : 'lg:w-[4.5rem]'
+        } ${recolhido && pairando ? 'lg:shadow-[8px_0_24px_rgb(0_0_0/0.35)]' : ''}`}
+      >
         <div className="flex h-16 items-center justify-between gap-3 px-5 lg:border-b lg:border-white/[0.06]">
           <div className="flex items-center gap-3">
             <img src="/conecta_logo.png" alt="Conecta" data-segredo="logo" className="h-8 w-auto object-contain" />
-            <div className="leading-tight">
-              <p className="text-sm font-semibold tracking-tight text-white">Portal Conecta</p>
+            <div className={`leading-tight transition-opacity duration-150 ${expandido ? '' : 'lg:opacity-0'}`}>
+              <p className="whitespace-nowrap text-sm font-semibold tracking-tight text-white">Portal Conecta</p>
               <p className="text-[11px] font-medium text-slate-500">Integrações Citel</p>
             </div>
           </div>
@@ -166,7 +208,9 @@ export default function App() {
           </div>
         </div>
 
-        <p className="hidden px-6 pb-2 pt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 lg:block">
+        <p
+          className={`hidden whitespace-nowrap px-6 pb-2 pt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 transition-opacity duration-150 lg:block ${expandido ? '' : 'lg:opacity-0'}`}
+        >
           Menu
         </p>
         <nav
@@ -183,7 +227,8 @@ export default function App() {
                 role="tab"
                 aria-selected={ativa}
                 onClick={() => setAba(id)}
-                className={`group relative flex shrink-0 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 ${
+                title={rotulo}
+                className={`group relative flex shrink-0 items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 ${
                   ativa
                     ? 'bg-white/[0.08] text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]'
                     : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-100'
@@ -193,14 +238,14 @@ export default function App() {
                   <span className="absolute left-0 top-1/2 hidden h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-400 lg:block" />
                 )}
                 <span
-                  className={`h-[18px] w-[18px] transition-colors duration-150 ${
+                  className={`h-[18px] w-[18px] shrink-0 transition-colors duration-150 ${
                     ativa ? 'text-brand-300' : 'text-slate-500 group-hover:text-slate-300'
                   }`}
                 >
                   <Icone />
                 </span>
-                {rotulo}
-                {id === 'tipos-erro' && <ContadorTiposPendentes />}
+                <span className={`transition-opacity duration-150 ${expandido ? '' : 'lg:opacity-0'}`}>{rotulo}</span>
+                {id === 'tipos-erro' && <ContadorTiposPendentes ponto={!expandido} />}
                 {id === 'monitoramento' && (
                   <span className="relative ml-auto flex h-2 w-2" title="Ao vivo">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-60" />
@@ -214,26 +259,42 @@ export default function App() {
 
         <div className="hidden space-y-1 border-t border-white/[0.06] p-3 lg:block">
           {/* Só no npm run dev: avisa quando o perfil do token está sendo ignorado, para ninguém testar o USR vendo o ADM. */}
-          {import.meta.env.DEV && import.meta.env.VITE_PERFIL_DEV && (
+          {import.meta.env.DEV && import.meta.env.VITE_PERFIL_DEV && expandido && (
             <p className="px-3 pb-1 text-[11px] font-medium text-amber-400">
               Dev: perfil forçado para {perfilDaSessao()} (VITE_PERFIL_DEV)
             </p>
           )}
-          <AlternarTema escuroFixo comRotulo />
-          <MenuUsuario usuario={usuario} aoSair={sairDoPortal} />
+          <button
+            type="button"
+            onClick={() => setRecolhido((r) => !r)}
+            title={recolhido ? 'Fixar o menu aberto' : 'Recolher o menu'}
+            aria-label={recolhido ? 'Fixar o menu aberto' : 'Recolher o menu'}
+            className="group flex w-full items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition-colors duration-150 hover:bg-white/[0.04] hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+          >
+            <span className="block h-[18px] w-[18px] shrink-0">{recolhido ? <IconeSetaDireita /> : <IconeSetaEsquerda />}</span>
+            <span className={`transition-opacity duration-150 ${expandido ? '' : 'lg:opacity-0'}`}>
+              {recolhido ? 'Fixar o menu aberto' : 'Recolher o menu'}
+            </span>
+          </button>
+          <AlternarTema escuroFixo comRotulo rotuloVisivel={expandido} />
+          <MenuUsuario usuario={usuario} aoSair={sairDoPortal} recolhido={!expandido} />
         </div>
       </aside>
 
-      <main className="px-4 py-8 sm:px-8 lg:px-10 lg:py-10">
-        <div className="mx-auto max-w-7xl">
-          <header key={aba} className="mb-8 animate-fade-in">
-            <h1
-              data-segredo={aba === 'monitoramento' ? 'titulo' : undefined}
-              className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px] sm:leading-9"
-            >
-              {atual.rotulo}
-            </h1>
-            <p className="mt-1.5 max-w-2xl text-sm text-slate-500">{atual.descricao}</p>
+      <main className="px-4 py-8 sm:px-6 lg:px-6 lg:py-8">
+        <div className={larguraTotal ? 'w-full' : 'mx-auto max-w-7xl'}>
+          <header key={aba} className="mb-8 flex animate-fade-in flex-wrap items-start justify-between gap-x-6 gap-y-3">
+            <div>
+              <h1
+                data-segredo={aba === 'monitoramento' ? 'titulo' : undefined}
+                className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[28px] sm:leading-9"
+              >
+                {atual.rotulo}
+              </h1>
+              <p className="mt-1.5 max-w-2xl text-sm text-slate-500">{atual.descricao}</p>
+            </div>
+            {/* Canto direito: onde a página coloca os controles dela (ex.: o seletor Dev / Cliente / Todos do Monitoramento). */}
+            <div id="acoes-da-pagina" className="shrink-0" />
           </header>
 
           <ErroNaTela reiniciarCom={aba}>

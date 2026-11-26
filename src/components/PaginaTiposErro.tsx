@@ -405,14 +405,21 @@ function DataEmDuasLinhas({ valor }: { valor?: string | null }) {
   )
 }
 
-/** Quantos tipos aguardam validação, para o menu lateral. Só monta para quem pode validar (DEV e ADM). */
-export function ContadorTiposPendentes() {
+/**
+ * Quantos tipos aguardam validação, para o menu lateral. Só monta para quem pode validar (DEV e ADM). Com o menu
+ * recolhido (`ponto`) vira um ponto no canto do ícone, porque o número não cabe.
+ */
+export function ContadorTiposPendentes({ ponto = false }: { ponto?: boolean }) {
   const { pendentes, carregado } = useTiposErro()
   if (!carregado || pendentes === 0) return null
+  const dica = `${pendentes} ${pendentes === 1 ? 'tipo aguarda' : 'tipos aguardam'} validação`
+  if (ponto) {
+    return <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-ink-900" title={dica} />
+  }
   return (
     <span
       className="ml-auto min-w-[1.25rem] rounded-full bg-amber-400/90 px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums text-ink-950"
-      title={`${pendentes} ${pendentes === 1 ? 'tipo aguarda' : 'tipos aguardam'} validação`}
+      title={dica}
     >
       {pendentes}
     </span>

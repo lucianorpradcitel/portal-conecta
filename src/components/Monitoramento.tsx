@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { apiGet } from '../services/api'
 import {
   assinarFilas,
@@ -215,6 +216,11 @@ export function Monitoramento() {
   // seletor (o USR só tem uma visão) não precisa; e numa API antiga, sem o endpoint, os totais só não aparecem.
   const [contagem, setContagem] = useState<ContagemErros | null>(null)
   const temSeletor = visoes.length > 1
+  // O seletor aparece no canto da página, ao lado do título (o App deixa o espaço "acoes-da-pagina" no cabeçalho).
+  const [slotAcoes, setSlotAcoes] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setSlotAcoes(document.getElementById('acoes-da-pagina'))
+  }, [])
   useEffect(() => {
     if (!temSeletor) return
     let ativo = true
@@ -645,9 +651,9 @@ export function Monitoramento() {
 
   return (
     <div className="space-y-6">
-      {resumo}
+      {slotAcoes && temSeletor && createPortal(<SeletorVisao visoes={visoes} atual={visao} onTrocar={trocarVisao} contagem={contagem} />, slotAcoes)}
 
-      <SeletorVisao visoes={visoes} atual={visao} onTrocar={trocarVisao} contagem={contagem} />
+      {resumo}
 
       <CartaoConsulta
         cabecalho={cabecalho}
@@ -916,7 +922,8 @@ function SeletorVisao({
   /** Erros por responsabilidade; nulo enquanto não chegou (ou se a API não tem o endpoint). */
   contagem: ContagemErros | null
 }) {
-  const definicao = visoes.find((v) => v.id === atual)
+  // Sem escolha (o USR só tem uma visão) não há seletor: a página mostra direto o que ele pode ver.
+  if (visoes.length <= 1) return null
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       {visoes.length > 1 && (
@@ -963,7 +970,6 @@ function SeletorVisao({
           })}
         </div>
       )}
-      {definicao && <p className="text-[13px] text-slate-500">{definicao.dica}</p>}
     </div>
   )
 }

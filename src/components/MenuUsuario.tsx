@@ -6,6 +6,8 @@ interface Props {
   aoSair: () => void
   /** Só o avatar e o botão de sair, para a barra do celular. */
   compacto?: boolean
+  /** Menu lateral recolhido: o nome e o botão de sair somem (e o botão não recebe clique), o avatar fica no mesmo lugar. */
+  recolhido?: boolean
 }
 
 /** "luciano.junior@citel..." vira "Luciano Junior" e "LJ". */
@@ -19,7 +21,7 @@ function apresentar(usuario: string): { nome: string; iniciais: string } {
   return { nome: nome || usuario, iniciais: iniciais.toUpperCase() }
 }
 
-export function MenuUsuario({ usuario, aoSair, compacto = false }: Props) {
+export function MenuUsuario({ usuario, aoSair, compacto = false, recolhido = false }: Props) {
   const { nome, iniciais } = apresentar(usuario ?? '')
   const email = usuario?.includes('@') ? usuario : null
 
@@ -33,7 +35,7 @@ export function MenuUsuario({ usuario, aoSair, compacto = false }: Props) {
       </span>
 
       {!compacto && (
-        <div className="min-w-0 flex-1 leading-tight">
+        <div className={`min-w-0 flex-1 leading-tight transition-opacity duration-150 ${recolhido ? 'lg:opacity-0' : ''}`}>
           <p className="truncate text-sm font-medium text-white">{nome}</p>
           {email && <p className="mt-0.5 truncate text-xs text-slate-500">{email}</p>}
         </div>
@@ -44,7 +46,7 @@ export function MenuUsuario({ usuario, aoSair, compacto = false }: Props) {
         onClick={aoSair}
         title="Sair"
         aria-label="Sair"
-        className="shrink-0 rounded-md p-2 text-slate-400 transition-colors duration-150 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        className={`shrink-0 rounded-md p-2 text-slate-400 transition-[colors,opacity] duration-150 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 ${recolhido ? 'lg:pointer-events-none lg:opacity-0' : ''}`}
       >
         <span className="block h-4 w-4">
           <IconeSair />
