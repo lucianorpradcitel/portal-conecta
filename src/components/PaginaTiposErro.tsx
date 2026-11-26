@@ -55,6 +55,8 @@ export function PaginaTiposErro() {
   const { tipos, pendentes, carregado, falha, sincronizando } = useTiposErro()
   const [filtro, setFiltro] = useState<Filtro>('pendentes')
   const [busca, setBusca] = useState('')
+  // Responsabilidade gravada no tipo ('' = todas). Vale em qualquer situação (Não validados, Validados, Todos).
+  const [responsabilidade, setResponsabilidade] = useState('')
   // Quem validou e quando (dia da validação, as duas pontas inclusivas). Só valem nas visões Validados e Todos.
   const [usuario, setUsuario] = useState('')
   const [de, setDe] = useState('')
@@ -92,11 +94,12 @@ export function PaginaTiposErro() {
       ),
     [tipos],
   )
-  const temFiltro = !!busca || (comFiltroDeValidacao && !!(usuario || de || ate))
+  const temFiltro = !!busca || !!responsabilidade || (comFiltroDeValidacao && !!(usuario || de || ate))
   const visiveis = useMemo(() => {
     const termo = normalizar(busca.trim())
     return [...tipos]
       .filter((t) => (filtro === 'todos' ? true : filtro === 'pendentes' ? t.validado !== 'S' : t.validado === 'S'))
+      .filter((t) => !responsabilidade || String(t.status) === responsabilidade)
       .filter(
         (t) =>
           !termo ||
@@ -113,10 +116,11 @@ export function PaginaTiposErro() {
         return !!dia && (!de || dia >= de) && (!ate || dia <= ate)
       })
       .sort((a, b) => b.dataCadastro.localeCompare(a.dataCadastro))
-  }, [tipos, filtro, busca, nomes, comFiltroDeValidacao, usuario, de, ate])
+  }, [tipos, filtro, busca, responsabilidade, nomes, comFiltroDeValidacao, usuario, de, ate])
 
   function limparFiltros() {
     setBusca('')
+    setResponsabilidade('')
     setUsuario('')
     setDe('')
     setAte('')
@@ -221,6 +225,16 @@ export function PaginaTiposErro() {
                 value={busca}
                 onChange={setBusca}
               />
+            </div>
+            <div className="w-full sm:w-52">
+              <SelectFiltro aria-label="Responsabilidade" value={responsabilidade} onChange={setResponsabilidade}>
+                <option value="">Todas as responsabilidades</option>
+                {Object.entries(ROTULO_RESPONSABILIDADE).map(([n, info]) => (
+                  <option key={n} value={n}>
+                    {info.rotulo}
+                  </option>
+                ))}
+              </SelectFiltro>
             </div>
             {comFiltroDeValidacao && (
               <>
