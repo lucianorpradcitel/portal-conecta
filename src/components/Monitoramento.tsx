@@ -399,10 +399,15 @@ export function Monitoramento() {
     setFiltros(FILTROS_VAZIOS)
   }
 
-  /** Outra visão recomeça os produtos da página 1; os pedidos vêm inteiros, então só refazem a consulta. */
+  /**
+   * Outra visão recomeça os produtos da página 1; os pedidos vêm inteiros, então só refazem a consulta. O cliente e a
+   * plataforma escolhidos voltam a "todos": numa visão em que eles não têm erro, o filtro ficaria preso e a lista vazia.
+   * A busca por texto (produto e mensagem) continua.
+   */
   function trocarVisao(nova: Visao) {
     setVisao(nova)
-    setConsulta((c) => (c.pagina === 1 ? c : { ...c, pagina: 1 }))
+    setFiltros((f) => (f.cliente || f.plataforma ? { ...f, cliente: '', plataforma: '' } : f))
+    setConsulta((c) => (c.pagina === 1 && !c.cliente && !c.plataforma ? c : { ...c, cliente: '', plataforma: '', pagina: 1 }))
   }
 
   function alterarFiltro(campo: keyof Filtros, valor: string) {
@@ -555,20 +560,25 @@ export function Monitoramento() {
     </>
   )
 
+  // Os cartões de pedidos e produtos valem para a visão aberta (os mesmos números das listas): com mais de uma
+  // visão, a legenda diz qual, para ninguém ler "Dev" como o total geral.
+  const rotuloDaVisao = visoes.find((v) => v.id === visao)?.rotulo
+  const sufixoVisao = visoes.length > 1 && rotuloDaVisao ? ` · visão ${rotuloDaVisao}` : ''
+
   const resumo = (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <CartaoResumo
         rotulo="Pedidos com erro"
         valor={totalPedidos}
         destaque={totalPedidos > 0}
-        legenda={totalPedidos > 0 ? 'Aguardando correção' : 'Tudo processado'}
+        legenda={(totalPedidos > 0 ? 'Aguardando correção' : 'Tudo processado') + sufixoVisao}
         icone={<IconeCaixa />}
       />
       <CartaoResumo
         rotulo="Produtos com erro"
         valor={totalProdutos}
         destaque={totalProdutos > 0}
-        legenda={totalProdutos > 0 ? 'Aguardando correção' : 'Tudo processado'}
+        legenda={(totalProdutos > 0 ? 'Aguardando correção' : 'Tudo processado') + sufixoVisao}
         icone={<IconeEtiqueta />}
       />
       <CartaoResumo
