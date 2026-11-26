@@ -9,6 +9,7 @@ import {
 } from '../services/filas'
 import {
   adicionarResponsabilidade,
+  ROTULO_RESPONSABILIDADE,
   somarVisao,
   visaoInicial,
   visoesDoPerfil,
@@ -84,9 +85,11 @@ interface Filtros {
   cliente: string
   plataforma: string
   erro: string
+  /** '' = as da visão; senão uma só (0 a 4), sempre uma das que a visão aberta mostra. */
+  responsabilidade: string
 }
 
-const FILTROS_VAZIOS: Filtros = { codigo: '', cliente: '', plataforma: '', erro: '' }
+const FILTROS_VAZIOS: Filtros = { codigo: '', cliente: '', plataforma: '', erro: '', responsabilidade: '' }
 
 /** 0 = todos os registros numa página só (a API trata tamanho=0 assim). */
 type TamanhoPagina = 50 | 100 | 1000 | 0
@@ -112,6 +115,7 @@ interface ConsultaProdutos {
   cliente: string
   plataforma: string
   erro: string
+  responsabilidade: string
 }
 
 const CONSULTA_PRODUTOS_INICIAL: ConsultaProdutos = {
@@ -122,11 +126,14 @@ const CONSULTA_PRODUTOS_INICIAL: ConsultaProdutos = {
   cliente: '',
   plataforma: '',
   erro: '',
+  responsabilidade: '',
 }
 
 function montarQueryProdutos(c: ConsultaProdutos, visao: Visao): string {
   const params = new URLSearchParams({ pagina: String(c.pagina), tamanho: String(c.tamanho), ordem: c.ordem })
-  adicionarResponsabilidade(params, visao)
+  // Uma responsabilidade escolhida no filtro vale no lugar das da visão (ela é sempre uma das da visão).
+  if (c.responsabilidade) params.append('responsabilidade', c.responsabilidade)
+  else adicionarResponsabilidade(params, visao)
   const filtros = { produtoContem: c.produto, cliente: c.cliente, plataforma: c.plataforma, erroContem: c.erro }
   for (const [nome, valor] of Object.entries(filtros)) {
     if (valor) params.set(nome, valor)
@@ -135,8 +142,11 @@ function montarQueryProdutos(c: ConsultaProdutos, visao: Visao): string {
 }
 
 /** Os filtros da tela no formato da consulta (sem espaços nas pontas). */
-function pesquisasDe(filtros: Filtros): Pick<ConsultaProdutos, 'produto' | 'cliente' | 'plataforma' | 'erro'> {
+function pesquisasDe(
+  filtros: Filtros,
+): Pick<ConsultaProdutos, 'produto' | 'cliente' | 'plataforma' | 'erro' | 'responsabilidade'> {
   return {
+    responsabilidade: filtros.responsabilidade,
     produto: filtros.codigo.trim(),
     cliente: filtros.cliente.trim(),
     plataforma: filtros.plataforma.trim(),
@@ -156,6 +166,8 @@ interface ItemFiltravel {
   cliente?: string | null
   plataforma?: string | null
   erro?: string | null
+  /** Ausente (API antiga) vale 0, como no selo. */
+  responsabilidade?: number | null
 }
 
 function filtrar<T extends ItemFiltravel>(
@@ -170,6 +182,7 @@ function filtrar<T extends ItemFiltravel>(
       (!codigo || normalizar(codigoDe(item)).includes(codigo)) &&
       (!filtros.cliente || item.cliente === filtros.cliente) &&
       (!filtros.plataforma || item.plataforma === filtros.plataforma) &&
+      (!filtros.responsabilidade || String(item.responsabilidade ?? 0) === filtros.responsabilidade) &&
       (!erro || normalizar(item.erro || '').includes(erro)),
   )
 }
@@ -375,6 +388,11 @@ export function Monitoramento() {
         : Array.from(new Set(pedidos.map((i) => i.plataforma).filter((p): p is string => !!p))).sort(),
     [subAba, opcoesProdutos, pedidos],
   )
+  // As responsabilidades que o filtro oferece: as da visão aberta (todas as cinco em "Todos").
+  const opcoesResponsabilidade = useMemo(
+    () => visoes.find((v) => v.id === visao)?.responsabilidades ?? Object.keys(ROTULO_RESPONSABILIDADE).map(Number),
+    [visoes, visao],
+  )
   const clientesAfetados = useMemo(
     () => new Set([...pedidos, ...produtos].map((i) => (i.cliente ?? '').toUpperCase())).size,
     [pedidos, produtos],
@@ -392,7 +410,11 @@ export function Monitoramento() {
     const alvo = pesquisasDe(subAba === 'produtos' ? filtros : FILTROS_VAZIOS)
     const espera = setTimeout(() => {
       setConsulta((c) =>
-        c.produto === alvo.produto && c.cliente === alvo.cliente && c.plataforma === alvo.plataforma && c.erro === alvo.erro
+        c.produto === alvo.produto &&
+        c.cliente === alvo.cliente &&
+        c.plataforma === alvo.plataforma &&
+        c.erro === alvo.erro &&
+        c.responsabilidade === alvo.responsabilidade
           ? c
           : { ...c, ...alvo, pagina: 1 },
       )
@@ -412,8 +434,14 @@ export function Monitoramento() {
    */
   function trocarVisao(nova: Visao) {
     setVisao(nova)
-    setFiltros((f) => (f.cliente || f.plataforma ? { ...f, cliente: '', plataforma: '' } : f))
-    setConsulta((c) => (c.pagina === 1 && !c.cliente && !c.plataforma ? c : { ...c, cliente: '', plataforma: '', pagina: 1 }))
+    setFiltros((f) =>
+      f.cliente || f.plataforma || f.responsabilidade ? { ...f, cliente: '', plataforma: '', responsabilidade: '' } : f,
+    )
+    setConsulta((c) =>
+      c.pagina === 1 && !c.cliente && !c.plataforma && !c.responsabilidade
+        ? c
+        : { ...c, cliente: '', plataforma: '', responsabilidade: '', pagina: 1 },
+    )
   }
 
   function alterarFiltro(campo: keyof Filtros, valor: string) {
@@ -433,7 +461,9 @@ export function Monitoramento() {
   const total = ehPedidos ? totalPedidos : totalProdutos
   const temFiltro = Object.values(filtros).some(Boolean)
   // Produtos vazios com pesquisa na consulta é "nada encontrado", não "fila sem erros".
-  const pesquisandoProdutos = [consulta.produto, consulta.cliente, consulta.plataforma, consulta.erro].some(Boolean)
+  const pesquisandoProdutos = [consulta.produto, consulta.cliente, consulta.plataforma, consulta.erro, consulta.responsabilidade].some(
+    Boolean,
+  )
   const semErros = ehPedidos ? pedidos.length === 0 : produtos.length === 0 && !pesquisandoProdutos
   const visiveis = ehPedidos ? pedidosFiltrados.length : produtos.length
   const termo = ehPedidos ? 'pedido' : 'produto'
@@ -442,7 +472,9 @@ export function Monitoramento() {
     setFiltros(FILTROS_VAZIOS)
     // Já limpa a consulta, sem esperar a pausa da digitação.
     setConsulta((c) =>
-      c.produto || c.cliente || c.plataforma || c.erro ? { ...c, ...pesquisasDe(FILTROS_VAZIOS), pagina: 1 } : c,
+      c.produto || c.cliente || c.plataforma || c.erro || c.responsabilidade
+        ? { ...c, ...pesquisasDe(FILTROS_VAZIOS), pagina: 1 }
+        : c,
     )
   }
 
@@ -658,7 +690,7 @@ export function Monitoramento() {
       <CartaoConsulta
         cabecalho={cabecalho}
         filtros={
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.3fr_auto] gap-3 items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1.3fr_auto] gap-3 items-center">
             <CampoBusca
               id="filtroCodigo"
               aria-label={ehPedidos ? 'Pedido' : 'Produto'}
@@ -689,6 +721,19 @@ export function Monitoramento() {
               {opcoesCom(plataformas, filtros.plataforma).map((p) => (
                 <option key={p} value={p}>
                   {p}
+                </option>
+              ))}
+            </SelectFiltro>
+            <SelectFiltro
+              id="filtroResponsabilidade"
+              aria-label="Responsabilidade"
+              value={filtros.responsabilidade}
+              onChange={(v) => alterarFiltro('responsabilidade', v)}
+            >
+              <option value="">Todas as responsabilidades</option>
+              {opcoesResponsabilidade.map((n) => (
+                <option key={n} value={n}>
+                  {ROTULO_RESPONSABILIDADE[n]?.rotulo ?? n}
                 </option>
               ))}
             </SelectFiltro>
