@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { apiGet } from '../services/api'
 import { ROTULO_RESPONSABILIDADE } from '../services/responsabilidade'
 import {
@@ -297,22 +297,31 @@ export function PaginaTiposErro() {
                   <Celula primeira className="whitespace-nowrap">
                     <EtiquetaPlataforma nome={nomeDaPlataforma(tipo.plataforma)} />
                   </Celula>
-                  <Celula className="whitespace-nowrap">
-                    <Codigo>{tipo.codigoErro}</Codigo>
+                  {/* Código longo (ex.: campos:promotional_price) quebra em vez de alargar a tabela. */}
+                  <Celula className="max-w-[11rem] break-words">
+                    {/* <wbr> depois de _ : e vírgula: a quebra cai entre as palavras e o texto copiado fica igual. */}
+                    <Codigo>
+                      {tipo.codigoErro.split(/(?<=[_:,])/).map((parte, i) => (
+                        <Fragment key={i}>
+                          {i > 0 && <wbr />}
+                          {parte}
+                        </Fragment>
+                      ))}
+                    </Codigo>
                   </Celula>
-                  <Celula className="min-w-[18rem]">
+                  <Celula className="min-w-[12rem]">
                     <p className="line-clamp-3 break-words leading-relaxed text-slate-600" title={tipo.exemplo ?? undefined}>
                       {tipo.exemplo || <span className="text-slate-400">Sem exemplo</span>}
                     </p>
                   </Celula>
                   <Celula className="whitespace-nowrap tabular-nums text-slate-600">
-                    {formatarDataHora(tipo.dataCadastro) ?? '—'}
+                    <DataEmDuasLinhas valor={tipo.dataCadastro} />
                   </Celula>
                   {mostrarValidadoPor && (
                     <Celula className="whitespace-nowrap">
                       {tipo.usuarioValidacao?.trim() ? (
                         <>
-                          <div className="max-w-[12rem] truncate text-slate-700" title={tipo.usuarioValidacao}>
+                          <div className="max-w-[9rem] truncate text-slate-700" title={tipo.usuarioValidacao}>
                             {tipo.usuarioValidacao}
                           </div>
                           {formatarDataHora(tipo.dataValidacao) && (
@@ -328,7 +337,7 @@ export function PaginaTiposErro() {
                     <SeloResponsabilidade valor={tipo.status} tipo={tipo} />
                   </Celula>
                   <Celula className="whitespace-nowrap">
-                    <div className="w-40">
+                    <div className="w-36">
                       <SelectFiltro
                         aria-label={`Responsabilidade de ${tipo.codigoErro}`}
                         value={String(escolhida)}
@@ -380,6 +389,19 @@ export function PaginaTiposErro() {
         )}
       </CartaoConsulta>
     </div>
+  )
+}
+
+/** Data em cima e hora embaixo: a coluna fica com metade da largura e a tabela cabe sem rolar para o lado. */
+function DataEmDuasLinhas({ valor }: { valor?: string | null }) {
+  const texto = formatarDataHora(valor)
+  if (!texto) return <>—</>
+  const [data, hora] = texto.split(', ')
+  return (
+    <>
+      <div>{data}</div>
+      {hora && <div className="text-xs text-slate-400">{hora}</div>}
+    </>
   )
 }
 
