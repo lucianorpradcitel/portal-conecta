@@ -8,8 +8,10 @@ import {
 } from '../services/filas'
 import {
   adicionarResponsabilidade,
+  somarVisao,
   visaoInicial,
   visoesDoPerfil,
+  type ContagemErros,
   type DefinicaoVisao,
   type Visao,
 } from '../services/responsabilidade'
@@ -209,6 +211,30 @@ export function Monitoramento() {
   const tipoDe = (codigo?: number | null) => (codigo == null ? undefined : tiposPorCodigo.get(codigo))
   const [visao, setVisao] = useState<Visao>(visaoInicial)
 
+  // O total de cada visão (pedidos + produtos) vem de um GET leve, à parte das listas, no mesmo ritmo delas. Sem
+  // seletor (o USR só tem uma visão) não precisa; e numa API antiga, sem o endpoint, os totais só não aparecem.
+  const [contagem, setContagem] = useState<ContagemErros | null>(null)
+  const temSeletor = visoes.length > 1
+  useEffect(() => {
+    if (!temSeletor) return
+    let ativo = true
+
+    function carregar() {
+      apiGet<ContagemErros>('/erros/contagem')
+        .then((recebida) => {
+          if (ativo) setContagem(recebida)
+        })
+        .catch((e: unknown) => console.error('[MONITORAMENTO] Erro ao carregar a contagem por visão', e))
+    }
+
+    carregar()
+    const intervalo = setInterval(carregar, INTERVALO_ATUALIZACAO_MS)
+    return () => {
+      ativo = false
+      clearInterval(intervalo)
+    }
+  }, [temSeletor])
+
   // O retrato das filas vive no serviço, não aqui: ao trocar de tela e voltar, o último retrato
   // continua na tela e a coleta só acontece quando passam 5 minutos ou a pessoa pede.
   const {
@@ -299,6 +325,8 @@ export function Monitoramento() {
       const params = new URLSearchParams()
       if (clienteConsultado) params.set('cliente', clienteConsultado)
       if (plataformaConsultada) params.set('plataforma', plataformaConsultada)
+      // Só os clientes e as plataformas que têm produto com erro da visão aberta, como a lista.
+      adicionarResponsabilidade(params, visao)
       apiGet<FiltrosProdutos>(`/produtos/filtros?${params.toString()}`)
         .then((recebidas) => {
           if (ativo) setOpcoesProdutos(recebidas)
@@ -312,7 +340,7 @@ export function Monitoramento() {
       ativo = false
       clearInterval(intervalo)
     }
-  }, [clienteConsultado, plataformaConsultada])
+  }, [clienteConsultado, plataformaConsultada, visao])
 
   const linhasFilas = useMemo(() => classificarClientes(retratoFilas), [retratoFilas])
   const clientesComFilaEmAtencao = useMemo(
@@ -609,7 +637,7 @@ export function Monitoramento() {
     <div className="space-y-6">
       {resumo}
 
-      <SeletorVisao visoes={visoes} atual={visao} onTrocar={trocarVisao} />
+      <SeletorVisao visoes={visoes} atual={visao} onTrocar={trocarVisao} contagem={contagem} />
 
       <CartaoConsulta
         cabecalho={cabecalho}
@@ -870,10 +898,13 @@ function SeletorVisao({
   visoes,
   atual,
   onTrocar,
+  contagem,
 }: {
   visoes: DefinicaoVisao[]
   atual: Visao
   onTrocar: (visao: Visao) => void
+  /** Erros por responsabilidade; nulo enquanto não chegou (ou se a API não tem o endpoint). */
+  contagem: ContagemErros | null
 }) {
   const definicao = visoes.find((v) => v.id === atual)
   return (
@@ -882,21 +913,41 @@ function SeletorVisao({
         <div className="inline-flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Responsabilidade do erro">
           {visoes.map((v) => {
             const ativa = v.id === atual
+            const produtos = contagem ? somarVisao(contagem.produtos, v.id) : null
+            const pedidos = contagem ? somarVisao(contagem.pedidos, v.id) : null
+            const total = produtos !== null && pedidos !== null ? produtos + pedidos : null
             return (
               <button
                 key={v.id}
                 type="button"
                 role="tab"
                 aria-selected={ativa}
-                title={v.dica}
+                title={
+                  total === null
+                    ? v.dica
+                    : `${v.dica}\n${produtos!.toLocaleString('pt-BR')} produtos e ${pedidos!.toLocaleString('pt-BR')} pedidos`
+                }
                 onClick={() => onTrocar(v.id)}
-                className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-all duration-150 ${
+                className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-sm font-medium transition-all duration-150 ${
                   ativa
                     ? 'bg-surface text-slate-900 shadow-soft ring-1 ring-slate-200/80 dark:bg-slate-200 dark:ring-slate-300/60'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {v.rotulo}
+                {total !== null && (
+                  <span
+                    className={`min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+                      total === 0
+                        ? 'bg-slate-200/70 text-slate-500'
+                        : ativa
+                          ? 'bg-red-500 text-white'
+                          : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {total.toLocaleString('pt-BR')}
+                  </span>
+                )}
               </button>
             )
           })}

@@ -85,6 +85,22 @@ export function visaoInicial(): Visao {
   return visoesDoPerfil()[0].id
 }
 
+/**
+ * O que o GET /erros/contagem devolve: quantos erros há em cada responsabilidade, para produtos e para pedidos.
+ * A chave é a responsabilidade (0 a 4); o USR só recebe 2 e 4.
+ */
+export interface ContagemErros {
+  produtos: Record<string, number>
+  pedidos: Record<string, number>
+}
+
+/** Soma, na contagem de um dos dois (produtos ou pedidos), as responsabilidades que a visão mostra. "Todos" soma tudo. */
+export function somarVisao(contagem: Record<string, number>, visao: Visao): number {
+  const definicao = VISOES.find((v) => v.id === visao)
+  const chaves = definicao?.responsabilidades ? definicao.responsabilidades.map(String) : Object.keys(contagem)
+  return chaves.reduce((soma, chave) => soma + (contagem[chave] ?? 0), 0)
+}
+
 /** Acrescenta `?responsabilidade=` à consulta da visão; "Todos" não acrescenta nada. */
 export function adicionarResponsabilidade(params: URLSearchParams, visao: Visao): void {
   const definicao = VISOES.find((v) => v.id === visao)
