@@ -33,8 +33,8 @@ export const ROTULO_RESPONSABILIDADE: Record<number, { rotulo: string; dica: str
   4: {
     rotulo: 'Plataforma',
     dica: 'Culpa da plataforma externa',
-    classe: 'bg-indigo-50 text-indigo-700 ring-indigo-600/15',
-    tracejado: 'border border-dashed border-indigo-400 bg-indigo-50/40 text-indigo-700',
+    classe: 'bg-violet-50 text-violet-700 ring-violet-600/15',
+    tracejado: 'border border-dashed border-violet-400 bg-violet-50/40 text-violet-700',
   },
 }
 
