@@ -55,7 +55,16 @@ function useTema(): [Tema, () => void] {
 }
 
 /** Botão sol/lua. "escuroFixo" é para fundos que já são escuros (menu lateral). */
-export function AlternarTema({ comRotulo = false, escuroFixo = false }: { comRotulo?: boolean; escuroFixo?: boolean }) {
+export function AlternarTema({
+  comRotulo = false,
+  escuroFixo = false,
+  rotuloVisivel = true,
+}: {
+  comRotulo?: boolean
+  escuroFixo?: boolean
+  /** Com o menu lateral recolhido o rótulo some (só o ícone fica), sem mudar a posição do ícone. */
+  rotuloVisivel?: boolean
+}) {
   const [tema, alternar] = useTema()
   const escuro = tema === 'escuro'
   const rotulo = escuro ? 'Modo claro' : 'Modo escuro'
@@ -74,7 +83,7 @@ export function AlternarTema({ comRotulo = false, escuroFixo = false }: { comRot
           : 'border border-slate-200 bg-surface text-slate-600 shadow-soft hover:bg-slate-50 hover:text-slate-900'
       }`}
     >
-      <span className="relative block h-[18px] w-[18px]">
+      <span className="relative block h-[18px] w-[18px] shrink-0">
         <span
           className={`absolute inset-0 transition-all duration-300 ${escuro ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-50 opacity-0'}`}
         >
@@ -86,7 +95,9 @@ export function AlternarTema({ comRotulo = false, escuroFixo = false }: { comRot
           <IconeLua />
         </span>
       </span>
-      {comRotulo && rotulo}
+      {comRotulo && (
+        <span className={`whitespace-nowrap transition-opacity duration-150 ${rotuloVisivel ? '' : 'lg:opacity-0'}`}>{rotulo}</span>
+      )}
     </button>
   )
 }

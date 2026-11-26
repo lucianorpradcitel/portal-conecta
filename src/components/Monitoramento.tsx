@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { apiGet } from '../services/api'
 import {
   assinarFilas,
@@ -6,13 +7,41 @@ import {
   lerEstadoFilas,
   sincronizarFilas,
 } from '../services/filas'
+import {
+  adicionarResponsabilidade,
+  ROTULO_RESPONSABILIDADE,
+  somarVisao,
+  visaoInicial,
+  visoesDoPerfil,
+  type ContagemErros,
+  type DefinicaoVisao,
+  type Visao,
+} from '../services/responsabilidade'
+import { useTiposErro } from '../services/tiposErro'
 import { coletaWebservices } from '../services/webservices'
 import { classificarClientes } from '../types/filas'
 import type { FiltrosProdutos, PaginaProdutos, PedidoComErro, ProdutoComErro } from '../types/monitoramento'
+import type { TipoErro } from '../types/tiposErro'
 import { PainelFilas } from './PainelFilas'
 import { PainelWebservices } from './PainelWebservices'
-import { CartaoResumo } from './ui/CartaoResumo'
-import { IconeAlerta, IconeAtividade, IconeCaixa, IconeCheck, IconeEtiqueta, IconeLupa, IconePessoas } from './ui/Icones'
+import { SeloResponsabilidade } from './ui/SeloResponsabilidade'
+import {
+  IconeAlerta,
+  IconeArquivo,
+  IconeAtividade,
+  IconeCaixa,
+  IconeCaminhao,
+  IconeCamadas,
+  IconeCheck,
+  IconeCifrao,
+  IconeEtiqueta,
+  IconeLupa,
+  IconePessoas,
+  IconePorcentagem,
+  IconeRaio,
+  IconeRecibo,
+  IconeUsuario,
+} from './ui/Icones'
 import {
   BotaoAtualizar,
   BotaoLimpar,
@@ -29,7 +58,21 @@ import {
   Tabela,
 } from './ui/Tabela'
 
-type SubAba = 'pedidos' | 'produtos' | 'filas' | 'webservices'
+type SubAba =
+  | 'pedidos'
+  | 'notaFiscal'
+  | 'produtos'
+  | 'cliente'
+  | 'condicaoPagamento'
+  | 'transportadora'
+  | 'titulos'
+  | 'tabelaPreco'
+  | 'atividade'
+  | 'tributacoes'
+  | 'limiteCredito'
+  | 'clientesAfetados'
+  | 'webservices'
+  | 'filas'
 
 const INTERVALO_ATUALIZACAO_MS = 10_000
 
@@ -71,9 +114,11 @@ interface Filtros {
   cliente: string
   plataforma: string
   erro: string
+  /** '' = as da visão; senão uma só (0 a 4), sempre uma das que a visão aberta mostra. */
+  responsabilidade: string
 }
 
-const FILTROS_VAZIOS: Filtros = { codigo: '', cliente: '', plataforma: '', erro: '' }
+const FILTROS_VAZIOS: Filtros = { codigo: '', cliente: '', plataforma: '', erro: '', responsabilidade: '' }
 
 /** 0 = todos os registros numa página só (a API trata tamanho=0 assim). */
 type TamanhoPagina = 50 | 100 | 1000 | 0
@@ -99,6 +144,7 @@ interface ConsultaProdutos {
   cliente: string
   plataforma: string
   erro: string
+  responsabilidade: string
 }
 
 const CONSULTA_PRODUTOS_INICIAL: ConsultaProdutos = {
@@ -109,10 +155,14 @@ const CONSULTA_PRODUTOS_INICIAL: ConsultaProdutos = {
   cliente: '',
   plataforma: '',
   erro: '',
+  responsabilidade: '',
 }
 
-function montarQueryProdutos(c: ConsultaProdutos): string {
+function montarQueryProdutos(c: ConsultaProdutos, visao: Visao): string {
   const params = new URLSearchParams({ pagina: String(c.pagina), tamanho: String(c.tamanho), ordem: c.ordem })
+  // Uma responsabilidade escolhida no filtro vale no lugar das da visão (ela é sempre uma das da visão).
+  if (c.responsabilidade) params.append('responsabilidade', c.responsabilidade)
+  else adicionarResponsabilidade(params, visao)
   const filtros = { produtoContem: c.produto, cliente: c.cliente, plataforma: c.plataforma, erroContem: c.erro }
   for (const [nome, valor] of Object.entries(filtros)) {
     if (valor) params.set(nome, valor)
@@ -121,8 +171,11 @@ function montarQueryProdutos(c: ConsultaProdutos): string {
 }
 
 /** Os filtros da tela no formato da consulta (sem espaços nas pontas). */
-function pesquisasDe(filtros: Filtros): Pick<ConsultaProdutos, 'produto' | 'cliente' | 'plataforma' | 'erro'> {
+function pesquisasDe(
+  filtros: Filtros,
+): Pick<ConsultaProdutos, 'produto' | 'cliente' | 'plataforma' | 'erro' | 'responsabilidade'> {
   return {
+    responsabilidade: filtros.responsabilidade,
     produto: filtros.codigo.trim(),
     cliente: filtros.cliente.trim(),
     plataforma: filtros.plataforma.trim(),
@@ -142,6 +195,8 @@ interface ItemFiltravel {
   cliente?: string | null
   plataforma?: string | null
   erro?: string | null
+  /** Ausente (API antiga) vale 0, como no selo. */
+  responsabilidade?: number | null
 }
 
 function filtrar<T extends ItemFiltravel>(
@@ -156,6 +211,7 @@ function filtrar<T extends ItemFiltravel>(
       (!codigo || normalizar(codigoDe(item)).includes(codigo)) &&
       (!filtros.cliente || item.cliente === filtros.cliente) &&
       (!filtros.plataforma || item.plataforma === filtros.plataforma) &&
+      (!filtros.responsabilidade || String(item.responsabilidade ?? 0) === filtros.responsabilidade) &&
       (!erro || normalizar(item.erro || '').includes(erro)),
   )
 }
@@ -190,6 +246,43 @@ export function Monitoramento() {
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_VAZIOS)
   const [consulta, setConsulta] = useState<ConsultaProdutos>(CONSULTA_PRODUTOS_INICIAL)
 
+  // O recorte por responsabilidade (Dev, Cliente, Todos) vale para pedidos e produtos. O perfil da sessão
+  // decide quais a pessoa vê: o USR só tem "Cliente". A API barra de novo quem pedir o que não pode.
+  const visoes = useMemo(visoesDoPerfil, [])
+  // Os tipos de erro: o selo de responsabilidade mostra, no hover, se o tipo foi validado e por quem.
+  const { porCodigo: tiposPorCodigo } = useTiposErro()
+  const tipoDe = (codigo?: number | null) => (codigo == null ? undefined : tiposPorCodigo.get(codigo))
+  const [visao, setVisao] = useState<Visao>(visaoInicial)
+
+  // O total de cada visão (pedidos + produtos) vem de um GET leve, à parte das listas, no mesmo ritmo delas. Sem
+  // seletor (o USR só tem uma visão) não precisa; e numa API antiga, sem o endpoint, os totais só não aparecem.
+  const [contagem, setContagem] = useState<ContagemErros | null>(null)
+  const temSeletor = visoes.length > 1
+  // O seletor aparece no canto da página, ao lado do título (o App deixa o espaço "acoes-da-pagina" no cabeçalho).
+  const [slotAcoes, setSlotAcoes] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setSlotAcoes(document.getElementById('acoes-da-pagina'))
+  }, [])
+  useEffect(() => {
+    if (!temSeletor) return
+    let ativo = true
+
+    function carregar() {
+      apiGet<ContagemErros>('/erros/contagem')
+        .then((recebida) => {
+          if (ativo) setContagem(recebida)
+        })
+        .catch((e: unknown) => console.error('[MONITORAMENTO] Erro ao carregar a contagem por visão', e))
+    }
+
+    carregar()
+    const intervalo = setInterval(carregar, INTERVALO_ATUALIZACAO_MS)
+    return () => {
+      ativo = false
+      clearInterval(intervalo)
+    }
+  }, [temSeletor])
+
   // O retrato das filas vive no serviço, não aqui: ao trocar de tela e voltar, o último retrato
   // continua na tela e a coleta só acontece quando passam 5 minutos ou a pessoa pede.
   const {
@@ -214,7 +307,9 @@ export function Monitoramento() {
 
     // Falha numa atualização não limpa a tela: fica o último retrato bom até a próxima.
     function carregar() {
-      apiGet<PedidoComErro[]>('/pendentes?status=2')
+      const params = new URLSearchParams({ status: '2' })
+      adicionarResponsabilidade(params, visao)
+      apiGet<PedidoComErro[]>(`/pendentes?${params.toString()}`)
         .then((recebidos) => {
           if (!ativo) return
           setPedidos((atual) => mesclar(atual, recebidos, chavePedido))
@@ -233,7 +328,7 @@ export function Monitoramento() {
       ativo = false
       clearInterval(intervalo)
     }
-  }, [])
+  }, [visao])
 
   // Produtos: o polling de 10s continua, mas cada GET pede só a página atual. Mudou a página, o tamanho
   // ou a ordem, o efeito recomeça e já busca na hora; a atualização automática mantém tudo isso.
@@ -241,7 +336,7 @@ export function Monitoramento() {
     let ativo = true
 
     function carregar() {
-      apiGet<PaginaProdutos>(`/produtos?${montarQueryProdutos(consulta)}`)
+      apiGet<PaginaProdutos>(`/produtos?${montarQueryProdutos(consulta, visao)}`)
         .then((resposta) => {
           if (!ativo) return
           setTotalProdutos(resposta.totalItens)
@@ -267,7 +362,7 @@ export function Monitoramento() {
       ativo = false
       clearInterval(intervalo)
     }
-  }, [consulta])
+  }, [consulta, visao])
 
   // Opções dos filtros de produtos: um GET à parte, leve, que acompanha o ritmo da lista
   const { cliente: clienteConsultado, plataforma: plataformaConsultada } = consulta
@@ -278,6 +373,8 @@ export function Monitoramento() {
       const params = new URLSearchParams()
       if (clienteConsultado) params.set('cliente', clienteConsultado)
       if (plataformaConsultada) params.set('plataforma', plataformaConsultada)
+      // Só os clientes e as plataformas que têm produto com erro da visão aberta, como a lista.
+      adicionarResponsabilidade(params, visao)
       apiGet<FiltrosProdutos>(`/produtos/filtros?${params.toString()}`)
         .then((recebidas) => {
           if (ativo) setOpcoesProdutos(recebidas)
@@ -291,7 +388,7 @@ export function Monitoramento() {
       ativo = false
       clearInterval(intervalo)
     }
-  }, [clienteConsultado, plataformaConsultada])
+  }, [clienteConsultado, plataformaConsultada, visao])
 
   const linhasFilas = useMemo(() => classificarClientes(retratoFilas), [retratoFilas])
   const clientesComFilaEmAtencao = useMemo(
@@ -303,8 +400,6 @@ export function Monitoramento() {
     () => (retratoWebservices?.itens ?? []).filter((w) => w.situacao === 'fora').length,
     [retratoWebservices],
   )
-
-  const webservicesChecados = !!retratoWebservices?.geradoEm
 
   const clientes = useMemo(
     () =>
@@ -320,10 +415,25 @@ export function Monitoramento() {
         : Array.from(new Set(pedidos.map((i) => i.plataforma).filter((p): p is string => !!p))).sort(),
     [subAba, opcoesProdutos, pedidos],
   )
+  // As responsabilidades que o filtro oferece: as da visão aberta (todas as cinco em "Todos").
+  const opcoesResponsabilidade = useMemo(
+    () => visoes.find((v) => v.id === visao)?.responsabilidades ?? Object.keys(ROTULO_RESPONSABILIDADE).map(Number),
+    [visoes, visao],
+  )
   const clientesAfetados = useMemo(
     () => new Set([...pedidos, ...produtos].map((i) => (i.cliente ?? '').toUpperCase())).size,
     [pedidos, produtos],
   )
+
+  // Cliente e plataforma de cada cliente afetado (a mesma conta do contador), em ordem alfabética.
+  const listaClientesAfetados = useMemo(() => {
+    const mapa = new Map<string, string | null | undefined>()
+    for (const i of [...pedidos, ...produtos]) {
+      const nome = (i.cliente ?? '').toUpperCase()
+      if (!mapa.has(nome) || !mapa.get(nome)) mapa.set(nome, i.plataforma)
+    }
+    return Array.from(mapa.entries()).sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+  }, [pedidos, produtos])
 
   // Pedidos vêm inteiros e são filtrados aqui. Produtos já chegam filtrados pela API.
   const pedidosFiltrados = useMemo(
@@ -337,7 +447,11 @@ export function Monitoramento() {
     const alvo = pesquisasDe(subAba === 'produtos' ? filtros : FILTROS_VAZIOS)
     const espera = setTimeout(() => {
       setConsulta((c) =>
-        c.produto === alvo.produto && c.cliente === alvo.cliente && c.plataforma === alvo.plataforma && c.erro === alvo.erro
+        c.produto === alvo.produto &&
+        c.cliente === alvo.cliente &&
+        c.plataforma === alvo.plataforma &&
+        c.erro === alvo.erro &&
+        c.responsabilidade === alvo.responsabilidade
           ? c
           : { ...c, ...alvo, pagina: 1 },
       )
@@ -348,6 +462,23 @@ export function Monitoramento() {
   function trocarSubAba(nova: SubAba) {
     setSubAba(nova)
     setFiltros(FILTROS_VAZIOS)
+  }
+
+  /**
+   * Outra visão recomeça os produtos da página 1; os pedidos vêm inteiros, então só refazem a consulta. O cliente e a
+   * plataforma escolhidos voltam a "todos": numa visão em que eles não têm erro, o filtro ficaria preso e a lista vazia.
+   * A busca por texto (produto e mensagem) continua.
+   */
+  function trocarVisao(nova: Visao) {
+    setVisao(nova)
+    setFiltros((f) =>
+      f.cliente || f.plataforma || f.responsabilidade ? { ...f, cliente: '', plataforma: '', responsabilidade: '' } : f,
+    )
+    setConsulta((c) =>
+      c.pagina === 1 && !c.cliente && !c.plataforma && !c.responsabilidade
+        ? c
+        : { ...c, cliente: '', plataforma: '', responsabilidade: '', pagina: 1 },
+    )
   }
 
   function alterarFiltro(campo: keyof Filtros, valor: string) {
@@ -367,7 +498,9 @@ export function Monitoramento() {
   const total = ehPedidos ? totalPedidos : totalProdutos
   const temFiltro = Object.values(filtros).some(Boolean)
   // Produtos vazios com pesquisa na consulta é "nada encontrado", não "fila sem erros".
-  const pesquisandoProdutos = [consulta.produto, consulta.cliente, consulta.plataforma, consulta.erro].some(Boolean)
+  const pesquisandoProdutos = [consulta.produto, consulta.cliente, consulta.plataforma, consulta.erro, consulta.responsabilidade].some(
+    Boolean,
+  )
   const semErros = ehPedidos ? pedidos.length === 0 : produtos.length === 0 && !pesquisandoProdutos
   const visiveis = ehPedidos ? pedidosFiltrados.length : produtos.length
   const termo = ehPedidos ? 'pedido' : 'produto'
@@ -376,7 +509,9 @@ export function Monitoramento() {
     setFiltros(FILTROS_VAZIOS)
     // Já limpa a consulta, sem esperar a pausa da digitação.
     setConsulta((c) =>
-      c.produto || c.cliente || c.plataforma || c.erro ? { ...c, ...pesquisasDe(FILTROS_VAZIOS), pagina: 1 } : c,
+      c.produto || c.cliente || c.plataforma || c.erro || c.responsabilidade
+        ? { ...c, ...pesquisasDe(FILTROS_VAZIOS), pagina: 1 }
+        : c,
     )
   }
 
@@ -403,19 +538,64 @@ export function Monitoramento() {
           { rotulo: 'Produto' },
         ]),
     { rotulo: ehPedidos ? 'Processamentos' : 'Tentativas' },
+    { rotulo: 'Responsabilidade' },
     { rotulo: 'Erro', className: 'w-full' },
     { rotulo: 'Rotina' },
   ]
 
   const emFilas = subAba === 'filas'
   const emWebservices = subAba === 'webservices'
-  // As filas usam amarelo ("atenção"): ainda não é falha, é volume acima do normal.
-  const abas = [
-    { id: 'pedidos', rotulo: 'Pedidos', contador: totalPedidos, icone: <IconeCaixa />, tom: 'erro' },
-    { id: 'produtos', rotulo: 'Produtos', contador: totalProdutos, icone: <IconeEtiqueta />, tom: 'erro' },
-    { id: 'filas', rotulo: 'Filas', contador: clientesComFilaEmAtencao, icone: <IconeAlerta />, tom: 'atencao' },
-    { id: 'webservices', rotulo: 'Webservices', contador: webservicesFora, icone: <IconeAtividade />, tom: 'erro' },
-  ] as const
+  const emClientesAfetados = subAba === 'clientesAfetados'
+  // Pedido e Produto são as listas de erro; Clientes, Webservice e Filas têm painel próprio. As demais entidades
+  // abrem um painel "sem leitura": a API ainda não tem endpoint de erros delas.
+  const emListaErros = subAba === 'pedidos' || subAba === 'produtos'
+  const SEM_LEITURA = '—'
+  type ItemAba = {
+    id: SubAba
+    rotulo: string
+    contador: number | string
+    icone: ReactNode
+    tom: 'erro' | 'atencao'
+    dica?: string
+  }
+  // Filas usam amarelo ("atenção"): ainda não é falha, é volume acima do normal. Sem leitura: "—".
+  const abas: ItemAba[] = [
+    { id: 'pedidos', rotulo: 'Pedido', contador: totalPedidos, icone: <IconeCaixa />, tom: 'erro' },
+    { id: 'notaFiscal', rotulo: 'Nota Fiscal', contador: SEM_LEITURA, icone: <IconeRecibo />, tom: 'erro' },
+    { id: 'produtos', rotulo: 'Produto', contador: totalProdutos, icone: <IconeEtiqueta />, tom: 'erro' },
+    { id: 'cliente', rotulo: 'Cliente', contador: SEM_LEITURA, icone: <IconeUsuario />, tom: 'erro' },
+    { id: 'condicaoPagamento', rotulo: 'Condição de pagamento', contador: SEM_LEITURA, icone: <IconeCifrao />, tom: 'erro' },
+    { id: 'transportadora', rotulo: 'Transportadora', contador: SEM_LEITURA, icone: <IconeCaminhao />, tom: 'erro' },
+    { id: 'titulos', rotulo: 'Títulos', contador: SEM_LEITURA, icone: <IconeArquivo />, tom: 'erro' },
+    { id: 'tabelaPreco', rotulo: 'Tabela de preço', contador: SEM_LEITURA, icone: <IconeCamadas />, tom: 'erro' },
+    { id: 'atividade', rotulo: 'Atividade', contador: SEM_LEITURA, icone: <IconeRaio />, tom: 'erro' },
+    { id: 'tributacoes', rotulo: 'Tributações', contador: SEM_LEITURA, icone: <IconePorcentagem />, tom: 'erro' },
+    { id: 'limiteCredito', rotulo: 'LimiteCredito', contador: SEM_LEITURA, icone: <IconeCifrao />, tom: 'erro' },
+    {
+      id: 'clientesAfetados',
+      rotulo: 'Clientes afetados',
+      contador: clientesAfetados,
+      icone: <IconePessoas />,
+      tom: 'erro',
+      dica: 'Clientes com pedido ou produto em erro',
+    },
+    {
+      id: 'webservices',
+      rotulo: 'Webservice',
+      contador: webservicesFora,
+      icone: <IconeAtividade />,
+      tom: 'erro',
+      dica: 'Webservices fora do ar',
+    },
+    {
+      id: 'filas',
+      rotulo: 'Filas com atenção',
+      contador: clientesComFilaEmAtencao,
+      icone: <IconeAlerta />,
+      tom: 'atencao',
+      dica: 'Clientes com alguma fila acima do limite',
+    },
+  ]
 
   // A hora ao lado do selo "ao vivo": a da última coleta da aba aberta.
   const horaDoSelo = emFilas
@@ -426,8 +606,8 @@ export function Monitoramento() {
 
   const cabecalho = (
     <>
-      <div className="inline-flex rounded-lg bg-slate-100 p-1" role="tablist">
-        {abas.map(({ id, rotulo, contador, icone, tom }) => {
+      <div className="grid w-full grid-cols-2 gap-1.5 rounded-lg bg-slate-100 p-1.5 sm:grid-cols-4 xl:grid-flow-col xl:grid-cols-none xl:auto-cols-[minmax(0,1fr)]" role="tablist">
+        {abas.map(({ id, rotulo, contador, icone, tom, dica }) => {
           const ativa = subAba === id
           return (
             <button
@@ -436,23 +616,18 @@ export function Monitoramento() {
               role="tab"
               aria-selected={ativa}
               onClick={() => trocarSubAba(id)}
-              title={
-                id === 'filas'
-                  ? 'Clientes com alguma fila acima do limite'
-                  : id === 'webservices'
-                    ? 'Webservices fora do ar'
-                    : undefined
-              }
-              className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-sm font-medium transition-all duration-150 ${
+              title={dica}
+              className={`relative flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-1.5 text-center text-[11px] font-medium leading-tight ring-1 ring-inset transition-all duration-150 ${
                 ativa
-                  ? 'bg-surface text-slate-900 shadow-soft ring-1 ring-slate-200/80 dark:bg-slate-200 dark:ring-slate-300/60'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-surface text-slate-900 shadow-soft ring-black/10 dark:bg-slate-200 dark:ring-white/15'
+                  : 'text-slate-500 ring-black/5 hover:bg-surface/60 hover:text-slate-800 hover:ring-black/10 dark:ring-white/[0.07] dark:hover:ring-white/15'
               }`}
             >
-              <span className={`h-4 w-4 ${ativa ? 'text-brand-600' : ''}`}>{icone}</span>
+              <span className={`h-3.5 w-3.5 ${ativa ? 'text-brand-600' : ''}`}>{icone}</span>
               {rotulo}
+              {contador !== SEM_LEITURA && (
               <span
-                className={`min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+                className={`absolute right-1 top-1 min-w-[1.1rem] rounded-full px-1 text-center text-[10px] leading-4 font-semibold tabular-nums ${
                   contador === 0
                     ? 'bg-slate-200/70 text-slate-500'
                     : tom === 'atencao'
@@ -464,96 +639,68 @@ export function Monitoramento() {
                         : 'bg-red-100 text-red-700'
                 }`}
               >
-                {contador}
+                {typeof contador === 'number' ? contador.toLocaleString('pt-BR') : contador}
               </span>
+              )}
             </button>
           )
         })}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-      {emFilas && (
-        <BotaoAtualizar
-          onClick={() => void sincronizarFilas()}
-          carregando={sincronizando}
-          rotulo="Sincronizar filas"
-          rotuloCarregando="Sincronizando…"
-        />
-      )}
-      {emWebservices && (
-        <BotaoAtualizar onClick={() => void coletaWebservices.sincronizar()} carregando={lendoWebservices} />
-      )}
-      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-        </span>
-        <span>
-          {emFilas ? 'Coleta a cada 5 min' : emWebservices ? 'Checagem a cada 1 min' : 'Ao vivo · a cada 10s'}
-          {horaDoSelo && (
-            <span className="text-emerald-600/70 tabular-nums"> · {new Date(horaDoSelo).toLocaleTimeString('pt-BR')}</span>
+      {(emFilas || emWebservices) && (
+        <div className="flex flex-wrap items-center gap-3">
+          {emFilas && (
+            <BotaoAtualizar
+              onClick={() => void sincronizarFilas()}
+              carregando={sincronizando}
+              rotulo="Sincronizar filas"
+              rotuloCarregando="Sincronizando…"
+            />
           )}
-        </span>
-      </div>
-      </div>
+          {emWebservices && (
+            <BotaoAtualizar onClick={() => void coletaWebservices.sincronizar()} carregando={lendoWebservices} />
+          )}
+        </div>
+      )}
     </>
   )
 
-  const resumo = (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      <CartaoResumo
-        rotulo="Pedidos com erro"
-        valor={totalPedidos}
-        destaque={totalPedidos > 0}
-        legenda={totalPedidos > 0 ? 'Aguardando correção' : 'Tudo processado'}
-        icone={<IconeCaixa />}
-      />
-      <CartaoResumo
-        rotulo="Produtos com erro"
-        valor={totalProdutos}
-        destaque={totalProdutos > 0}
-        legenda={totalProdutos > 0 ? 'Aguardando correção' : 'Tudo processado'}
-        icone={<IconeEtiqueta />}
-      />
-      <CartaoResumo
-        rotulo="Clientes afetados"
-        valor={clientesAfetados}
-        legenda="Com pedido ou produto em erro"
-        icone={<IconePessoas />}
-      />
-      <CartaoResumo
-        rotulo="Filas em atenção"
-        valor={clientesComFilaEmAtencao}
-        destaque={clientesComFilaEmAtencao > 0}
-        tom="atencao"
-        legenda={
-          clientesComFilaEmAtencao > 0 ? 'Clientes com fila acima do limite' : 'Todas as filas dentro do limite'
-        }
-        icone={<IconeAlerta />}
-      />
-      <CartaoResumo
-        rotulo="Webservices fora do ar"
-        valor={webservicesFora}
-        // Vermelho com algum fora do ar; verde quando a checagem já veio e não há nenhum. Antes da primeira
-        // checagem fica neutro: zero ali ainda não quer dizer que está tudo no ar.
-        destaque={webservicesFora > 0 || webservicesChecados}
-        tom={webservicesFora > 0 ? 'erro' : 'sucesso'}
-        legenda={
-          webservicesFora > 0
-            ? 'Sem resposta na última checagem'
-            : webservicesChecados
-              ? 'Todos respondendo'
-              : 'Aguardando a checagem'
-        }
-        icone={<IconeAtividade />}
-      />
+  // No topo da página, à esquerda do seletor Dev / Cliente / Todos (o App deixa o espaço "acoes-da-pagina" no
+  // cabeçalho): o selo "ao vivo" e, nas abas de erro, o seletor.
+  const seloAoVivo = (
+    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
+      <span className="relative flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+      </span>
+      <span>
+        {emFilas ? 'Coleta a cada 5 min' : emWebservices ? 'Checagem a cada 1 min' : 'Ao vivo · a cada 10s'}
+        {horaDoSelo && (
+          <span className="text-emerald-600/70 tabular-nums"> · {new Date(horaDoSelo).toLocaleTimeString('pt-BR')}</span>
+        )}
+      </span>
     </div>
   )
+  const topo =
+    slotAcoes &&
+    createPortal(
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {seloAoVivo}
+        {temSeletor && !emFilas && !emWebservices && (
+          <SeletorVisao visoes={visoes} atual={visao} onTrocar={trocarVisao} contagem={contagem} />
+        )}
+      </div>,
+      slotAcoes,
+    )
+
+  // A página não rola: cada painel preenche a altura que sobra e só a lista rola, por dentro.
+  const CLASSE_TELA =
+    'flex min-h-0 flex-1 flex-col [&>.cartao-consulta]:min-h-0 [&>.cartao-consulta]:flex-1 [&_.tabela-rolavel]:max-h-none'
 
   if (emWebservices) {
     return (
-      <div className="space-y-6">
-        {resumo}
+      <div className={CLASSE_TELA}>
+        {topo}
         <PainelWebservices
           cabecalho={cabecalho}
           retrato={retratoWebservices}
@@ -565,8 +712,8 @@ export function Monitoramento() {
 
   if (emFilas) {
     return (
-      <div className="space-y-6">
-        {resumo}
+      <div className={CLASSE_TELA}>
+        {topo}
         <PainelFilas
           cabecalho={cabecalho}
           linhas={linhasFilas}
@@ -577,14 +724,52 @@ export function Monitoramento() {
     )
   }
 
+  if (!emListaErros) {
+    const entidade = abas.find((a) => a.id === subAba)
+    return (
+      <div className={CLASSE_TELA}>
+        {topo}
+        <CartaoConsulta cabecalho={cabecalho}>
+          {emClientesAfetados ? (
+            clientesAfetados === 0 ? (
+              <EstadoVazio
+                tom="sucesso"
+                icone={<IconeCheck />}
+                titulo="Nenhum cliente afetado"
+                texto="Nenhum cliente com pedido ou produto em erro."
+              />
+            ) : (
+              <Tabela colunas={[{ rotulo: 'Cliente' }, { rotulo: 'Plataforma', className: 'w-full' }]}>
+                {listaClientesAfetados.map(([cliente, plataforma]) => (
+                  <Linha key={cliente}>
+                    <CelulaCliente nome={cliente} />
+                    <Celula ultima className="whitespace-nowrap">
+                      <EtiquetaPlataforma nome={plataforma} />
+                    </Celula>
+                  </Linha>
+                ))}
+              </Tabela>
+            )
+          ) : (
+            <EstadoVazio
+              icone={<IconeLupa />}
+              titulo={entidade?.rotulo}
+              texto="Ainda não há leitura de erros desta entidade: a API não entrega esse total."
+            />
+          )}
+        </CartaoConsulta>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
-      {resumo}
+    <div className={CLASSE_TELA}>
+      {topo}
 
       <CartaoConsulta
         cabecalho={cabecalho}
         filtros={
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.3fr_auto] gap-3 items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1.3fr_auto] gap-3 items-center">
             <CampoBusca
               id="filtroCodigo"
               aria-label={ehPedidos ? 'Pedido' : 'Produto'}
@@ -615,6 +800,19 @@ export function Monitoramento() {
               {opcoesCom(plataformas, filtros.plataforma).map((p) => (
                 <option key={p} value={p}>
                   {p}
+                </option>
+              ))}
+            </SelectFiltro>
+            <SelectFiltro
+              id="filtroResponsabilidade"
+              aria-label="Responsabilidade"
+              value={filtros.responsabilidade}
+              onChange={(v) => alterarFiltro('responsabilidade', v)}
+            >
+              <option value="">Todas as responsabilidades</option>
+              {opcoesResponsabilidade.map((n) => (
+                <option key={n} value={n}>
+                  {ROTULO_RESPONSABILIDADE[n]?.rotulo ?? n}
                 </option>
               ))}
             </SelectFiltro>
@@ -649,7 +847,9 @@ export function Monitoramento() {
             tom="sucesso"
             icone={<IconeCheck />}
             titulo={`Nenhum ${termo} com erro`}
-            texto={`Todos os ${termo}s foram processados com sucesso!`}
+            texto={
+              visao === 'todos' ? `Todos os ${termo}s foram processados com sucesso!` : `Nenhum ${termo} com erro nesta visão.`
+            }
           />
         ) : visiveis === 0 ? (
           <EstadoVazio
@@ -678,6 +878,7 @@ export function Monitoramento() {
                       <Codigo>{p.codigoPedido}</Codigo>
                     </Celula>
                     <CelulaContagem valor={p.sequencialProcessamento} />
+                    <CelulaResponsabilidade valor={p.responsabilidade} tipo={tipoDe(p.codigoMensagem)} />
                     <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                     <CelulaRotina texto={p.rotina?.toUpperCase() || 'Não Informado'} vazia={!p.rotina} />
                   </Linha>
@@ -704,6 +905,7 @@ export function Monitoramento() {
                         <Codigo>{p.codigoProduto || '—'}</Codigo>
                       </Celula>
                       <CelulaContagem valor={p.tentativa} />
+                      <CelulaResponsabilidade valor={p.responsabilidade} tipo={tipoDe(p.codigoMensagem)} />
                       <CelulaErro texto={p.erro || 'Erro desconhecido'} />
                       <CelulaRotina texto={p.rotina?.toUpperCase() || 'N/A'} vazia={!p.rotina} />
                     </Linha>
@@ -828,6 +1030,80 @@ function RodapePaginacao({
         </form>
       </div>
     </div>
+  )
+}
+
+/** Dev, Cliente e Todos: o recorte dos erros por responsabilidade. Quem só tem uma visão vê só o texto dela. */
+function SeletorVisao({
+  visoes,
+  atual,
+  onTrocar,
+  contagem,
+}: {
+  visoes: DefinicaoVisao[]
+  atual: Visao
+  onTrocar: (visao: Visao) => void
+  /** Erros por responsabilidade; nulo enquanto não chegou (ou se a API não tem o endpoint). */
+  contagem: ContagemErros | null
+}) {
+  // Sem escolha (o USR só tem uma visão) não há seletor: a página mostra direto o que ele pode ver.
+  if (visoes.length <= 1) return null
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      {visoes.length > 1 && (
+        <div className="inline-flex rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Responsabilidade do erro">
+          {visoes.map((v) => {
+            const ativa = v.id === atual
+            const produtos = contagem ? somarVisao(contagem.produtos, v.id) : null
+            const pedidos = contagem ? somarVisao(contagem.pedidos, v.id) : null
+            const total = produtos !== null && pedidos !== null ? produtos + pedidos : null
+            return (
+              <button
+                key={v.id}
+                type="button"
+                role="tab"
+                aria-selected={ativa}
+                title={
+                  total === null
+                    ? v.dica
+                    : `${v.dica}\n${produtos!.toLocaleString('pt-BR')} produtos e ${pedidos!.toLocaleString('pt-BR')} pedidos`
+                }
+                onClick={() => onTrocar(v.id)}
+                className={`flex items-center gap-2 rounded-md px-3.5 py-1.5 text-sm font-medium transition-all duration-150 ${
+                  ativa
+                    ? 'bg-surface text-slate-900 shadow-soft ring-1 ring-slate-200/80 dark:bg-slate-200 dark:ring-slate-300/60'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {v.rotulo}
+                {total !== null && (
+                  <span
+                    className={`min-w-[1.5rem] rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+                      total === 0
+                        ? 'bg-slate-200/70 text-slate-500'
+                        : ativa
+                          ? 'bg-red-500 text-white'
+                          : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {total.toLocaleString('pt-BR')}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** De quem é o erro. Sem o campo (API antiga) ou sem tipo, vale "A classificar". */
+function CelulaResponsabilidade({ valor, tipo }: { valor?: number | null; tipo?: TipoErro }) {
+  return (
+    <Celula className="whitespace-nowrap">
+      <SeloResponsabilidade valor={valor} tipo={tipo} />
+    </Celula>
   )
 }
 

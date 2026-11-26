@@ -10,6 +10,10 @@ export interface PedidoComErro {
   status: number
   /** PEN_SEQPRC: começa em 0 e sobe 1 a cada vez que o pedido é reenviado ao Monint. */
   sequencialProcessamento?: number
+  /** De quem é o erro (0 a 4), lido do tipo do erro. Ausente em API antiga; vale 0 (veja services/responsabilidade.ts). */
+  responsabilidade?: number | null
+  /** PEN_CODMSG: o tipo do erro (GET /tipos-erro). Nulo = erro sem tipo. */
+  codigoMensagem?: number | null
 }
 
 /** Item do GET /pedidos?cliente= — todos os pedidos de um lojista, em qualquer status. */
@@ -63,4 +67,8 @@ export interface ProdutoComErro {
   rotina?: string | null
   /** PRO_TENTAT: começa em 1 na primeira falha e sobe 1 a cada nova. */
   tentativa?: number
+  /** De quem é o erro (0 a 4), lido do tipo do erro. Ausente em API antiga; vale 0 (veja services/responsabilidade.ts). */
+  responsabilidade?: number | null
+  /** PRO_CODMSG: o tipo do erro (GET /tipos-erro). Nulo = erro sem tipo. */
+  codigoMensagem?: number | null
 }

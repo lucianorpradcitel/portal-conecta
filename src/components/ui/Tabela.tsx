@@ -158,14 +158,14 @@ export function CartaoConsulta({
   children: ReactNode
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
-      <div className="group flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+    <div className="cartao-consulta flex flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-surface shadow-card">
+      <div className="group flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
         {cabecalho}
       </div>
-      {filtros && <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">{filtros}</div>}
+      {filtros && <div className="shrink-0 border-b border-slate-100 bg-slate-50/60 px-5 py-3">{filtros}</div>}
       {children}
       {rodape && (
-        <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-[13px] text-slate-500">{rodape}</div>
+        <div className="shrink-0 border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-[13px] text-slate-500">{rodape}</div>
       )}
     </div>
   )
@@ -364,7 +364,7 @@ export function Tabela({
     <div
       ref={ref}
       onMouseDown={aoPressionar}
-      className={`overflow-auto ${alturaMaxima} ${
+      className={`tabela-rolavel min-h-0 flex-[1_1_auto] overflow-auto ${alturaMaxima} ${
         arrastavel ? (arrastando ? 'cursor-grabbing select-none' : 'cursor-grab') : ''
       }`}
     >
